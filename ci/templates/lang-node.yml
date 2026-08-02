@@ -1,0 +1,12 @@
+# TypeScript and Node static validation.
+
+.lang-node-template:
+  stage: lint
+  image: node:22-alpine
+  script:
+    - cd "${SERVICE_PATH}"
+    - npm ci --no-audit --no-fund
+    - npx eslint .
+    - npx tsc --noEmit
+  rules:
+    - changes: ["${SERVICE_PATH}/**", "ci/templates/**", ".gitlab-ci.yml"]

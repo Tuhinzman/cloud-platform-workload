@@ -1,0 +1,13 @@
+
+# Modified from the upstream OpenTelemetry Demo release 2.2.0.
+# Change: COPY source paths retargeted from src/ to services/ for this repository layout.
+
+FROM cypress/included:14.5.0
+
+WORKDIR /app
+
+COPY ./services/frontend .
+
+RUN npm clean-install
+
+ENTRYPOINT ["cypress", "run"]

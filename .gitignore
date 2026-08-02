@@ -1,0 +1,51 @@
+# Build output across the language tiers present in services/.
+# Each broad pattern is followed by re-inclusions for upstream content that lives at a
+# path of the same shape. Without them the root commit would silently drop committed
+# upstream files and the derivation record would stop being true.
+
+build/
+!services/currency/build/
+
+bin/
+!services/flagd-ui/rel/overlays/bin/
+
+vendor/
+!services/flagd-ui/assets/vendor/
+
+obj/
+dist/
+target/
+_build/
+deps/
+*.o
+*.so
+*.dll
+*.exe
+
+# Dependency trees that are restored rather than committed
+node_modules/
+.pnp.*
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.bundle/
+
+# Framework and toolchain caches
+.next/
+.nuxt/
+.gradle/
+.dotnet/
+.cargo/
+
+# Local environment and editor state
+.env.local
+.env.*.local
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Scan and SBOM output, which belongs in pipeline artifacts rather than in Git
+*.sbom.json
+trivy-results.*

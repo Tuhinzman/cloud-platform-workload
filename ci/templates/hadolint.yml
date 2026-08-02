@@ -1,0 +1,10 @@
+# Dockerfile linting. Warnings are logged and only errors gate the pipeline, so that
+# advisory findings stay visible without blocking on style.
+
+.hadolint-template:
+  stage: lint
+  image: hadolint/hadolint:v2.14.0-alpine
+  script:
+    - hadolint --failure-threshold=error "${SERVICE_PATH}/Dockerfile"
+  rules:
+    - changes: ["${SERVICE_PATH}/Dockerfile", "ci/templates/**", ".gitlab-ci.yml"]

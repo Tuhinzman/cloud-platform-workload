@@ -1,0 +1,20 @@
+# Declarative configuration for payment. Behaviour lives in ci/templates.
+#
+# IMAGE_REPO is deliberately absent. It resolves to the platform registry, and that
+# coordinate does not exist yet, so the scan job stays inactive rather than pointing
+# somewhere wrong.
+
+.payment-vars: &payment-vars
+  SERVICE_NAME: payment
+  SERVICE_PATH: services/payment
+  LANG_TIER: node
+
+.adolint:
+  extends: .hadolint-template
+  variables:
+    <<: *payment-vars
+
+payment:lint-node:
+  extends: .lang-node-template
+  variables:
+    <<: *payment-vars

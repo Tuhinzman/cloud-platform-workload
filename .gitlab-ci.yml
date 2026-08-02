@@ -1,0 +1,25 @@
+# Root pipeline. Services contribute declarative configuration only, and shared behaviour
+# lives in ci/templates. Service-local pipeline logic requires a written justification.
+#
+# Stages beyond lint and scan are defined but not yet populated. Build, publication, and
+# promotion depend on decisions that are not made yet: the runner executor model, the
+# platform registry, and federated pipeline credentials. Empty stages are declared here so
+# the order is visible, and they are filled when those decisions exist.
+
+stages:
+  - lint
+  - build
+  - scan
+  - health-test
+  - publish
+  - promote
+
+include:
+  - local: ci/templates/hadolint.yml
+  - local: ci/templates/lang-go.yml
+  - local: ci/templates/lang-node.yml
+  - local: ci/templates/trivy-scan.yml
+  - local: services/checkout/ci.yml
+  - local: services/product-catalog/ci.yml
+  - local: services/frontend/ci.yml
+  - local: services/payment/ci.yml

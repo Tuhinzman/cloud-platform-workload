@@ -1,0 +1,26 @@
+# Modified from the upstream OpenTelemetry Demo release 2.2.0.
+# Change: paths retargeted from src/ to services/, and entries for directories this
+# repository does not carry were dropped.
+#
+# This file governs the whole build, because every container definition here builds from
+# the repository root. A per-service context cannot be used: seven components copy from the
+# shared contract at pb/, which sits outside any single service directory.
+#
+# Container definitions are excluded from the context deliberately. Docker reads the
+# Dockerfile through -f rather than from the context, so excluding them keeps an edit to
+# one service's definition from invalidating cached layers for every other service.
+
+services/*/README.md
+services/*/Dockerfile
+services/*/*/Dockerfile
+services/*/Dockerfile.cypress
+
+# currency
+./services/currency/client.js
+./services/currency/node_modules/
+
+# frontend
+./services/frontend/node_modules/
+
+# shipping
+./services/shipping/target

@@ -1,0 +1,20 @@
+# Declarative configuration for checkout. Behaviour lives in ci/templates.
+#
+# IMAGE_REPO is deliberately absent. It resolves to the platform registry, and that
+# coordinate does not exist yet, so the scan job stays inactive rather than pointing
+# somewhere wrong.
+
+.checkout-vars: &checkout-vars
+  SERVICE_NAME: checkout
+  SERVICE_PATH: services/checkout
+  LANG_TIER: go
+
+.adolint:
+  extends: .hadolint-template
+  variables:
+    <<: *checkout-vars
+
+checkout:lint-go:
+  extends: .lang-go-template
+  variables:
+    <<: *checkout-vars

@@ -1,0 +1,52 @@
+# Container image scanning in two passes, and the order is the point.
+#
+# Pass one never fails the job and always writes its findings as an artifact. Pass two
+# applies the gate. Running them in this order means a blocked pipeline still leaves
+# triage evidence behind, which a gate-only pipeline does not.
+#
+# The scanner image is pinned by digest so a tag move cannot change what ran. The database
+# cache key carries the scanner version, so a version bump invalidates the cache instead
+# of silently reusing an old database.
+#
+# This template cannot run until a build stage produces an image and IMAGE_REPO resolves
+# to a real registry. Both depend on decisions that are not made yet. The logic here is
+# the reviewed pattern, not a placeholder.
+
+.trivy-scan-template:
+  stage: scan
+  image:
+    name: aquasec/trivy:0.70.0@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
+    entrypoint: [""]
+  variables:
+    TRIVY_CACHE_DIR: .trivycache
+    TRIVY_NO_PROGRESS: "true"
+  cache:
+    key: trivy-db-0.70.0
+    paths:
+      - .trivycache/
+  before_script:
+    - mkdir -p .trivycache
+    - touch .trivy-combined-ignore.txt
+    - if [ -f "${SERVICE_PATH}/.trivyignore" ]; then cat "${SERVICE_PATH}/.trivyignore" >> .trivy-combined-ignore.txt; fi
+  script:
+    - |
+      trivy image \
+        --severity HIGH,CRITICAL \
+        --format json \
+        --output trivy-findings.json \
+        --exit-code 0 \
+        "${IMAGE_REPO}:${CI_COMMIT_SHORT_SHA}"
+    - |
+      trivy image \
+        --severity HIGH,CRITICAL \
+        --ignore-unfixed \
+        --ignorefile .trivy-combined-ignore.txt \
+        --exit-code 1 \
+        "${IMAGE_REPO}:${CI_COMMIT_SHORT_SHA}"
+  artifacts:
+    paths:
+      - trivy-findings.json
+    expire_in: 30 days
+    when: always
+  rules:
+    - changes: ["${SERVICE_PATH}/**", "ci/templates/**", ".gitlab-ci.yml"]
