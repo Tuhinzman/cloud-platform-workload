@@ -245,7 +245,7 @@ container registry, and a personal image namespace.
 | File | Component | Tier | Origin and justification |
 |---|---|---|---|
 | `services/checkout/ci.yml` | checkout | Go | Structure follows the prior project's per-service configuration contract. Carried because the Go tier template exists, so these jobs run |
-| `services/product-catalog/ci.yml` | product-catalog | Go | Same contract. This component was one of two the prior project had onboarded, so the shape is proven |
+| `services/product-catalog/ci.yml` | product-catalog | Go | Same contract. This component was one of two the prior project had onboarded, so this configuration pattern had already been exercised in the prior project |
 | `services/frontend/ci.yml` | frontend | TypeScript | Same contract. The other component the prior project had onboarded |
 | `services/payment/ci.yml` | payment | TypeScript | Same contract. Carried because the TypeScript tier template exists |
 
@@ -310,8 +310,14 @@ git archive 2.2.0 pb | tar -x -C ../out/pb --strip-components=1
 git show 2.2.0:LICENSE > ../out/LICENSE
 ```
 
-Comparing `../out` against `services/`, `pb/`, and `LICENSE` should report differences in
-exactly the twenty-two container definitions marked modified above, and in no other file.
-Every file that differs carries a modification notice, and every file carrying a notice
-differs. That correspondence is the check worth running, because it fails loudly if a change
-is made without recording it.
+Comparing `../out` against `services/`, `pb/`, and `LICENSE` reports two kinds of
+difference and nothing else. Exactly the twenty-two upstream-derived container
+definitions recorded as modified above differ in content. Four files are present here and
+absent upstream: `services/checkout/ci.yml`, `services/product-catalog/ci.yml`,
+`services/frontend/ci.yml`, and `services/payment/ci.yml`. Those four are project-added
+pipeline configuration with no upstream origin, so no modification notice applies to them.
+
+The notice correspondence covers the modified upstream-derived container definitions only.
+Every one of them that differs carries a modification notice, and every one carrying a
+notice differs. That correspondence is the check worth running, because it fails loudly if
+a change is made without recording it.
