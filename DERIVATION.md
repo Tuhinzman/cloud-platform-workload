@@ -235,7 +235,7 @@ container registry, and a personal image namespace.
 | Carried artefact | Origin | Why it is valid here |
 |---|---|---|
 | Stage order in `.gitlab-ci.yml` | Prior project root pipeline | Matches the stage sequence ADR-0009 requires and carries no environment assumption |
-| `ci/templates/hadolint.yml` | Prior project | Lints a Dockerfile with an image, executes today against this repository, and the error-only threshold keeps advisory findings visible without blocking |
+| `ci/templates/hadolint.yml` | Prior project | Reusable Dockerfile linting template for the delivery model. Not yet extended by a job, so it does not execute today |
 | `ci/templates/lang-go.yml` | Prior project | Module download, lint, and compile check. Runs today against checkout and product-catalog |
 | `ci/templates/lang-node.yml` | Prior project | Dependency install, lint, and type check. Runs today against frontend and payment |
 | `ci/templates/trivy-scan.yml` | Prior project | The two-pass order is the reason it is carried. Pass one always writes findings as an artifact and pass two applies the gate, so a blocked pipeline still leaves triage evidence behind |
