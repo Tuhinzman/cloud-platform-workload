@@ -5,8 +5,10 @@
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout.
 # Change: the build output is a file, so the COPY that carries it into the runtime stage
 # no longer has a trailing slash, which BuildKit reads as a directory and rejects.
+# Change: the builder is pinned to an explicit Go patch version, raised to 1.25.13 to clear
+# the stdlib findings the image scan reported.
 
-FROM golang:1.24-bookworm AS builder
+FROM golang:1.25.13-bookworm AS builder
 
 WORKDIR /usr/src/app/
 
