@@ -8,9 +8,10 @@
 # cache key carries the scanner version, so a version bump invalidates the cache instead
 # of silently reusing an old database.
 #
-# This template cannot run until a build stage produces an image and IMAGE_REPO resolves
-# to a real registry. Both depend on decisions that are not made yet. The logic here is
-# the reviewed pattern, not a placeholder.
+# The scan reads the tar the build stage saved rather than a registry tag. Scanning a
+# published image would mean publishing before the gate, which is the opposite of what
+# the gate exists for. The SBOM is written between the two passes, so it survives a
+# pipeline the gate blocks.
 
 .trivy-scan-template:
   stage: scan
@@ -35,18 +36,24 @@
         --format json \
         --output trivy-findings.json \
         --exit-code 0 \
-        "${IMAGE_REPO}:${CI_COMMIT_SHORT_SHA}"
+        --input image.tar
+    - |
+      trivy image \
+        --format cyclonedx \
+        --output sbom.cdx.json \
+        --input image.tar
     - |
       trivy image \
         --severity HIGH,CRITICAL \
         --ignore-unfixed \
         --ignorefile .trivy-combined-ignore.txt \
         --exit-code 1 \
-        "${IMAGE_REPO}:${CI_COMMIT_SHORT_SHA}"
+        --input image.tar
   artifacts:
     paths:
       - trivy-findings.json
+      - sbom.cdx.json
     expire_in: 30 days
     when: always
   rules:
-    - changes: ["${SERVICE_PATH}/**", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]

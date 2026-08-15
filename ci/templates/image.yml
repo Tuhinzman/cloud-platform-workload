@@ -1,0 +1,58 @@
+# Image build and container start validation, both on GitLab.com hosted runners.
+#
+# Docker-in-Docker rather than a mounted host socket. A job holding the daemon socket
+# controls every container on that host, which is the pattern this project rejected, and
+# the dind service needs no runner of our own.
+#
+# The build stays local. Nothing reaches the registry before the scan gate has run, so
+# the image travels to the later stages as a saved tar artifact rather than a registry
+# tag, and a blocked pipeline publishes nothing.
+
+.docker-dind:
+  image: docker:28-cli
+  services:
+    - docker:28-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: "1"
+    DOCKER_CERT_PATH: "/certs/client"
+
+.image-build-template:
+  extends: .docker-dind
+  stage: build
+  script:
+    - docker build -f "${SERVICE_PATH}/Dockerfile" -t "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" .
+    - docker save -o image.tar "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
+  artifacts:
+    paths:
+      - image.tar
+    expire_in: 1 day
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+
+# What this proves is bounded: the image starts, stays up, and accepts a connection on
+# its port. It is not a functional test, and it deliberately points the service at
+# addresses that do not resolve, because the gRPC clients connect lazily and a first
+# digest must not require the rest of the fleet to exist.
+#
+# HEALTH_ENV is expanded unquoted so the service supplies its own required environment
+# without every service needing its own job.
+.image-health-template:
+  extends: .docker-dind
+  stage: health-test
+  script:
+    - docker load -i image.tar
+    - docker run -d --name "${SERVICE_NAME}-health" -p "${HEALTH_PORT}:${HEALTH_PORT}" ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
+    - |
+      for i in $(seq 1 30); do
+        if nc -z docker "${HEALTH_PORT}"; then break; fi
+        sleep 1
+      done
+    - nc -z docker "${HEALTH_PORT}"
+    - test "$(docker inspect -f '{{.State.Running}}' "${SERVICE_NAME}-health")" = "true"
+    - docker logs "${SERVICE_NAME}-health"
+  after_script:
+    - docker rm -f "${SERVICE_NAME}-health" || true
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]

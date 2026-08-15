@@ -3,6 +3,8 @@
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout.
+# Change: the build output is a file, so the COPY that carries it into the runtime stage
+# no longer has a trailing slash, which BuildKit reads as a directory and rejects.
 
 FROM golang:1.24-bookworm AS builder
 
@@ -24,7 +26,7 @@ FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /usr/src/app/
 
-COPY --from=builder /usr/src/app/checkout/ ./
+COPY --from=builder /usr/src/app/checkout ./
 
 EXPOSE ${CHECKOUT_PORT}
 ENTRYPOINT [ "./checkout" ]

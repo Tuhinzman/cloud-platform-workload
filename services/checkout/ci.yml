@@ -1,15 +1,19 @@
 # Declarative configuration for checkout. Behaviour lives in ci/templates.
 #
-# IMAGE_REPO is deliberately absent. It resolves to the platform registry, and that
-# coordinate does not exist yet, so the scan job stays inactive rather than pointing
-# somewhere wrong.
+# checkout is the first service wired to the platform registry. Only the repository name
+# is written here: the account-bearing registry host arrives as a masked project variable,
+# because it identifies the AWS account.
+#
+# The health job points the service at addresses that do not resolve. Its gRPC clients
+# connect lazily, so the container starts and serves without the rest of the fleet, and
+# what the job proves stays limited to startup.
 
 .checkout-vars: &checkout-vars
   SERVICE_NAME: checkout
   SERVICE_PATH: services/checkout
   LANG_TIER: go
 
-.adolint:
+checkout:lint-dockerfile:
   extends: .hadolint-template
   variables:
     <<: *checkout-vars
@@ -18,3 +22,38 @@ checkout:lint-go:
   extends: .lang-go-template
   variables:
     <<: *checkout-vars
+
+checkout:test-go:
+  extends: .lang-go-test-template
+  variables:
+    <<: *checkout-vars
+
+checkout:build:
+  extends: .image-build-template
+  variables:
+    <<: *checkout-vars
+
+checkout:scan-image:
+  extends: .trivy-scan-template
+  variables:
+    <<: *checkout-vars
+
+checkout:health-test:
+  extends: .image-health-template
+  variables:
+    <<: *checkout-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e CHECKOUT_PORT=8080
+      -e PRODUCT_CATALOG_ADDR=unused:8080
+      -e SHIPPING_ADDR=unused:8080
+      -e CART_ADDR=unused:8080
+      -e CURRENCY_ADDR=unused:8080
+      -e EMAIL_ADDR=unused:8080
+      -e PAYMENT_ADDR=unused:8080
+
+checkout:publish:
+  extends: .ecr-publish-template
+  variables:
+    <<: *checkout-vars
+    ECR_REPOSITORY: astroshop/checkout
