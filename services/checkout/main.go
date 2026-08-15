@@ -1,5 +1,14 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
+
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: status.Errorf replaced with status.Error where the message is a
+// non-constant string, which Go 1.24 vet rejects as a non-constant format string.
+// Change: the error from openfeature.SetProvider is explicitly discarded rather
+// than silently dropped.
+// Change: the receive from the Kafka Successes channel no longer assigns to the
+// blank identifier.
+
 package main
 
 import (
@@ -191,7 +200,7 @@ func main() {
 		logger.Error(fmt.Sprintf("Error creating flagd provider: %v", err))
 	}
 
-	openfeature.SetProvider(provider)
+	_ = openfeature.SetProvider(provider)
 	openfeature.AddHooks(otelhooks.NewTracesHook())
 
 	tracer = tp.Tracer("checkout")
@@ -313,7 +322,7 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 
 	prep, err := cs.prepareOrderItemsAndShippingQuoteFromCart(ctx, req.UserId, req.UserCurrency, req.Address)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 	span.AddEvent("prepared")
 
@@ -667,7 +676,7 @@ func (cs *checkout) sendToPostProcessor(ctx context.Context, result *pb.OrderRes
 		for i := 0; i < ffValue; i++ {
 			go func(i int) {
 				cs.KafkaProducerClient.Input() <- &msg
-				_ = <-cs.KafkaProducerClient.Successes()
+				<-cs.KafkaProducerClient.Successes()
 			}(i)
 		}
 		logger.Info(fmt.Sprintf("Done with #%d messages for overload simulation.", ffValue))
