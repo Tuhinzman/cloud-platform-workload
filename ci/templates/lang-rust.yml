@@ -1,0 +1,39 @@
+# Rust static validation. The toolchain image matches the builder stage of the service
+# Dockerfile, so a passing lint job compiles the crate on the same toolchain the image
+# build will use and a lint pass predicts a build pass.
+#
+# The official Rust images install with the minimal rustup profile, which carries neither
+# clippy nor rustfmt, so clippy is added explicitly. This mirrors the Go tier, which
+# installs its linter rather than assuming the image ships one. The command is idempotent
+# and costs nothing if a future image tag starts including the component.
+#
+# No formatter gate. Neither the Go nor the Node tier checks formatting, and adding one
+# here would apply a control to Rust that the rest of the repository does not carry.
+#
+# --locked is the Rust equivalent of building against a committed go.sum: it refuses to
+# silently update Cargo.lock, so a dependency cannot move between the lint job and the
+# image build.
+
+.lang-rust-template:
+  stage: lint
+  image: rust:1.91
+  script:
+    - cd "${SERVICE_PATH}"
+    - cargo --version
+    - rustup component add clippy
+    - cargo clippy --locked --all-targets -- -D warnings
+    - cargo build --locked
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+
+# Separate from the lint template so a service opts in only where tests actually exist.
+# Extending it from a service with no test files would report a passing test job that
+# asserted nothing.
+.lang-rust-test-template:
+  stage: lint
+  image: rust:1.91
+  script:
+    - cd "${SERVICE_PATH}"
+    - cargo test --locked
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]

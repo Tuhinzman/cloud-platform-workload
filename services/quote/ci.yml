@@ -1,0 +1,59 @@
+# Declarative configuration for quote. Behaviour lives in ci/templates.
+#
+# Only the repository name is written here: the account-bearing registry host arrives as a
+# masked project variable, because it identifies the AWS account.
+#
+# There is no test job, and that is a statement about the service rather than an omission
+# in this file. quote declares no require-dev section in composer.json, carries no test
+# runner, no test configuration and no test directory, so no automated test exists to run.
+# A test job here would extend a tier that asserted nothing. The lint tier's parse check is
+# the only automated evidence this service currently produces about its own source.
+#
+# The health job sets QUOTE_PORT and nothing else. public/index.php:100 builds the listen
+# address from it, so the socket cannot open without it. It is also the only variable the
+# service requires: the whole of app/, public/ and src/ reads exactly two environment
+# variables, and the other, IPV6_ENABLED at public/index.php:93, is optional and leaves the
+# bind at 0.0.0.0, which is the address the health check connects to.
+#
+# quote calls no other service. Its one route computes a quote arithmetically at
+# app/routes.php:29-30, so unlike checkout this health job needs no placeholder addresses
+# for absent fleet members.
+
+.quote-vars: &quote-vars
+  SERVICE_NAME: quote
+  SERVICE_PATH: services/quote
+  LANG_TIER: php
+
+quote:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *quote-vars
+
+quote:lint-php:
+  extends: .lang-php-template
+  variables:
+    <<: *quote-vars
+
+quote:build:
+  extends: .image-build-template
+  variables:
+    <<: *quote-vars
+
+quote:scan-image:
+  extends: .trivy-scan-template
+  variables:
+    <<: *quote-vars
+
+quote:health-test:
+  extends: .image-health-template
+  variables:
+    <<: *quote-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e QUOTE_PORT=8080
+
+quote:publish:
+  extends: .ecr-publish-template
+  variables:
+    <<: *quote-vars
+    ECR_REPOSITORY: astroshop/quote

@@ -1,0 +1,63 @@
+# Declarative configuration for shipping. Behaviour lives in ci/templates.
+#
+# Only the repository name is written here: the account-bearing registry host arrives as a
+# masked project variable, because it identifies the AWS account.
+#
+# The health job sets SHIPPING_PORT and nothing else, and the omission is deliberate rather
+# than an oversight. src/main.rs:25 reads SHIPPING_PORT with .expect(), so the process
+# panics without it. QUOTE_ADDR is not set because it is never read at startup: it is read
+# inside request_quote() at src/shipping_service/quote.rs:43, which runs only on an inbound
+# /getquote request, and it already falls back to a default when unset. The health job
+# starts the container and checks the port, so it never reaches that path. Pointing
+# QUOTE_ADDR at an unused address would suggest this job exercises the quote dependency,
+# which it does not.
+#
+# IPV6_ENABLED is also unset. src/main.rs:32 treats it as optional and binds 0.0.0.0
+# without it, which is the address the health check connects to.
+
+.shipping-vars: &shipping-vars
+  SERVICE_NAME: shipping
+  SERVICE_PATH: services/shipping
+  LANG_TIER: rust
+
+shipping:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *shipping-vars
+
+shipping:lint-rust:
+  extends: .lang-rust-template
+  variables:
+    <<: *shipping-vars
+
+# shipping owns unit tests, so it opts into the test tier. They are pure functions over
+# quote formatting at src/shipping_service/quote.rs:99 and :114, plus the module at
+# src/shipping_service.rs:59. They require no network and no sibling service.
+shipping:test-rust:
+  extends: .lang-rust-test-template
+  variables:
+    <<: *shipping-vars
+
+shipping:build:
+  extends: .image-build-template
+  variables:
+    <<: *shipping-vars
+
+shipping:scan-image:
+  extends: .trivy-scan-template
+  variables:
+    <<: *shipping-vars
+
+shipping:health-test:
+  extends: .image-health-template
+  variables:
+    <<: *shipping-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e SHIPPING_PORT=8080
+
+shipping:publish:
+  extends: .ecr-publish-template
+  variables:
+    <<: *shipping-vars
+    ECR_REPOSITORY: astroshop/shipping

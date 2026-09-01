@@ -1,0 +1,34 @@
+# PHP static validation.
+#
+# The image is the same Composer image the service Dockerfile already pins for its vendor
+# stage, so this tier introduces no image into the repository that the build did not
+# already trust. It carries both a PHP runtime and Composer, which is what lets one job
+# cover both checks below.
+#
+# What this tier deliberately does NOT contain: a linter, a static analyser, and a test
+# runner. The PHP service in this repository declares no require-dev section, so no such
+# tool is available to it. Installing one here would add a control the service does not
+# own and would report on a configuration that exists nowhere in the repository.
+#
+# php -l is the strongest check PHP offers without adding a dependency: it is the parse
+# step of the interpreter, so it fails on any file the runtime could not load. vendor/ is
+# excluded because third-party sources are not this repository's to gate, and the scan
+# stage is what covers dependency risk. -n1 keeps one file per invocation, because php -l
+# reports only the first file it is given.
+#
+# composer validate checks the manifest the vendor stage installs from. --no-check-lock is
+# required rather than preferred: this service carries no committed lock file, so the
+# default lock check would fail on a condition this tier is not authorized to change.
+# --no-check-publish drops the packagist-readiness rules, which do not apply to a service
+# that is never published as a library.
+
+.lang-php-template:
+  stage: lint
+  image: composer:2.8.12
+  script:
+    - cd "${SERVICE_PATH}"
+    - php -v
+    - composer validate --no-check-publish --no-check-lock
+    - find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]

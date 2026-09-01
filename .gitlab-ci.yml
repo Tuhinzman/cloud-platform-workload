@@ -2,7 +2,9 @@
 # lives in ci/templates. Service-local pipeline logic requires a written justification.
 #
 # checkout populates every stage through publish, because it is the service the first
-# digest is built from. The other services stay on lint until they are wired in turn.
+# digest is built from. shipping and quote follow the same shape, because the workload pair
+# they form has to be built and published by this pipeline before it can be exercised. The
+# remaining services stay on lint until they are wired in turn.
 # Promotion is a change to the GitOps repository, so nothing fills that stage here.
 #
 # Secret detection is GitLab's own analyzer rather than the image scanner. It answers a
@@ -21,6 +23,8 @@ include:
   - local: ci/templates/hadolint.yml
   - local: ci/templates/lang-go.yml
   - local: ci/templates/lang-node.yml
+  - local: ci/templates/lang-rust.yml
+  - local: ci/templates/lang-php.yml
   - local: ci/templates/image.yml
   - local: ci/templates/trivy-scan.yml
   - local: ci/templates/ecr-publish.yml
@@ -29,6 +33,8 @@ include:
   - local: services/product-catalog/ci.yml
   - local: services/frontend/ci.yml
   - local: services/payment/ci.yml
+  - local: services/shipping/ci.yml
+  - local: services/quote/ci.yml
 
 secret_detection:
   stage: lint
