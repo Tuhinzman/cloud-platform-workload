@@ -85,7 +85,7 @@ exactly as upstream wrote them.
 |---|---|---|
 | `services/accounting/Dockerfile` | accounting | Path-only modified |
 | `services/ad/Dockerfile` | ad | Path-only modified |
-| `services/checkout/Dockerfile` | checkout | Path-only modified |
+| `services/checkout/Dockerfile` | checkout | Path retarget, plus a runtime-stage `COPY` correction and the builder raised from `golang:1.24-bookworm` to a pinned `golang:1.25.13-bookworm` |
 | `services/checkout/genproto/Dockerfile` | checkout | Path-only modified |
 | `services/currency/genproto/Dockerfile` | currency | Path-only modified |
 | `services/fraud-detection/Dockerfile` | fraud-detection | Path-only modified |
