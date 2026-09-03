@@ -56,10 +56,8 @@ the tree.
 
 The pipeline now has shared templates for Go, Node/TypeScript, PHP, and Rust, but validation
 coverage is not uniform across the fleet. Checkout has an executed and passing Dockerfile
-lint path. Shipping and quote declare executable Dockerfile-lint jobs, but their pipelines
-have not yet been executed. Frontend, payment, and product-catalog currently declare
-dot-prefixed `.adolint` jobs, so those jobs are hidden templates rather than executable
-pipeline jobs.
+lint path. Shipping, quote, frontend, payment, and product-catalog declare executable Dockerfile-lint
+jobs, but their pipelines have not yet been executed.
 
 Checkout has also completed build, scan, SBOM, and artifact-publication stages. Those
 stages are not yet evidenced fleet-wide, and promotion remains a separate implementation
