@@ -7,4 +7,8 @@
   script:
     - hadolint --failure-threshold=error "${SERVICE_PATH}/Dockerfile"
   rules:
-    - changes: ["${SERVICE_PATH}/Dockerfile", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes:
+        - "${SERVICE_PATH}/Dockerfile"
+        - "${SERVICE_PATH}/ci.yml"
+        - "ci/templates/**"
+        - ".gitlab-ci.yml"
