@@ -4,9 +4,10 @@ Per-component evidence for the fleet. This is the single copy. The platform refe
 repository links here rather than holding a second table, because two copies of a status
 table drift apart.
 
-**Evidence status is empty throughout.** Nothing has been built, scanned, published, or
-deployed. A filled-in inventory ahead of implementation would be a claim rather than a
-record. Identity and classification are facts about the source and are populated now.
+**Evidence status is partial.** Checkout has build, scan, SBOM, artifact-publication, and
+bounded runtime evidence. Evidence for other components remains unpopulated until the
+corresponding implementation and validation have actually occurred. Identity and
+classification are facts about the source and are populated independently of that evidence.
 
 Five classes. Every component belongs to exactly one, and the class decides what evidence
 it owes.

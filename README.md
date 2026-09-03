@@ -36,8 +36,9 @@ implementation would be a claim rather than a record.
 
 ## Current Status
 
-Nothing is implemented. No image has been built, no scan has run, no SBOM exists, no
-artifact has been published, and no cluster has run any of this.
+Implementation evidence is partial. Checkout has been built, scanned, published with an
+SBOM, and validated during a bounded EKS runtime window. That runtime was subsequently
+torn down, and no runtime is currently live.
 
 Twenty-two container definitions are modified, each carrying an Apache-2.0 modification
 notice. They are adapted deliberately, for this repository's build layout and for the
@@ -53,10 +54,16 @@ Upstream wrote this application and none of it is claimed as this project's work
 [DERIVATION.md](DERIVATION.md) is the per-file record of what differs and how to reproduce
 the tree.
 
-The pipeline runs real static validation today for Dockerfiles, Go, and TypeScript, across
-four services in the two language tiers whose templates exist. Building, scanning,
-publishing, and promotion are defined as stages but not yet populated, because each
-depends on a decision that has not been made.
+The pipeline now has shared templates for Go, Node/TypeScript, PHP, and Rust, but validation
+coverage is not uniform across the fleet. Checkout has an executed and passing Dockerfile
+lint path. Shipping and quote declare executable Dockerfile-lint jobs, but their pipelines
+have not yet been executed. Frontend, payment, and product-catalog currently declare
+dot-prefixed `.adolint` jobs, so those jobs are hidden templates rather than executable
+pipeline jobs.
+
+Checkout has also completed build, scan, SBOM, and artifact-publication stages. Those
+stages are not yet evidenced fleet-wide, and promotion remains a separate implementation
+and validation obligation.
 
 ## Licence and Attribution
 
