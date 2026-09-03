@@ -22,7 +22,7 @@ hardening, the pipeline, and the evidence.
 | accounting | .NET | `src/accounting` | Path-only modified | None |
 | ad | Java | `src/ad` | Path-only modified | None |
 | cart | .NET | `src/cart` | Path plus hardening | Unit, `tests/CartServiceTests.cs` |
-| checkout | Go | `src/checkout` | Path-only modified | Unit, `money/money_test.go` |
+| checkout | Go | `src/checkout` | Modified beyond path retarget | Unit, `money/money_test.go` |
 | currency | C++ | `src/currency` | Path plus hardening | None |
 | email | Ruby | `src/email` | Path plus hardening | None |
 | flagd-ui | Elixir | `src/flagd-ui` | Path plus hardening | Unit and controller, seven files |
