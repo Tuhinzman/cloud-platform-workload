@@ -119,6 +119,30 @@ entirely. That adaptation is not carried, because it does not work for the seven
 that copy from `pb/`, and using two different context models across one fleet would make
 the pipeline harder to share than the problem it solves.
 
+### Modified upstream files that are not container definitions
+
+The table above covers container definitions. Three upstream-derived files under
+`services/checkout/` also differ from the pinned source, and they are recorded here so the
+modification inventory is not limited to container definitions. The checkout application
+remains upstream work. What follows are corrections and dependency movement applied on top
+of it, not authorship of the service.
+
+| File | Kind | Change measured against the pinned source |
+|---|---|---|
+| `services/checkout/main.go` | Application source | Three static-analysis corrections, each already stated in the file's own modification notice: `status.Errorf` replaced with `status.Error` where the message is a non-constant string, which `go vet` rejects as a non-constant format string; the error returned by `openfeature.SetProvider` explicitly discarded rather than silently dropped; and the receive from the Kafka `Successes()` channel no longer assigned to the blank identifier. Applied in `348490c`. |
+| `services/checkout/go.mod` | Dependency and toolchain metadata | The `go` directive raised from `1.24.2` to `1.25.0`, direct dependencies advanced, and the indirect set re-resolved as a consequence. Applied in `a384c3d` and `bf07e2e`. |
+| `services/checkout/go.sum` | Dependency checksum metadata | The checksum lines corresponding to the `go.mod` change above, touching thirty-five distinct module paths. Applied in the same two changes. |
+
+The two dependency changes were made to move off modules the image scan reported findings
+against, which is the reason recorded in `a384c3d` and `bf07e2e`. Neither the changes nor
+this record claims any review of those dependencies beyond that.
+
+`main.go` carries an Apache-2.0 modification notice in the format described below. `go.mod`
+and `go.sum` carry none, and none is added: `go.sum` has no comment syntax, neither file
+carries an upstream copyright or licence header for a notice to sit beneath, and both are
+resolver-generated metadata rather than authored source. This table is the record of their
+modification.
+
 ### Hardening applied, by component
 
 | Component | Change beyond the path retargeting |
@@ -310,14 +334,23 @@ git archive 2.2.0 pb | tar -x -C ../out/pb --strip-components=1
 git show 2.2.0:LICENSE > ../out/LICENSE
 ```
 
-Comparing `../out` against `services/`, `pb/`, and `LICENSE` reports two kinds of
-difference and nothing else. Exactly the twenty-two upstream-derived container
-definitions recorded as modified above differ in content. Four files are present here and
-absent upstream: `services/checkout/ci.yml`, `services/product-catalog/ci.yml`,
-`services/frontend/ci.yml`, and `services/payment/ci.yml`. Those four are project-added
-pipeline configuration with no upstream origin, so no modification notice applies to them.
+The comparison scope is `services/`, `pb/`, and `LICENSE`. Within that scope, comparing
+`../out` against this tree reports two kinds of difference and nothing else. Twenty-five
+upstream-derived files differ in content: the twenty-two container definitions recorded as
+modified above, plus `services/checkout/main.go`, `services/checkout/go.mod`, and
+`services/checkout/go.sum`, which the preceding section records. Those three are what
+separates this result from the earlier twenty-two figure, which counted modified container
+definitions only. Six files are present here and absent upstream: the per-service `ci.yml`
+under `checkout`, `product-catalog`, `frontend`, `payment`, `shipping`, and `quote`. Those
+six are project-added pipeline configuration with no upstream origin, so no modification
+notice applies to them.
 
-The notice correspondence covers the modified upstream-derived container definitions only.
-Every one of them that differs carries a modification notice, and every one carrying a
-notice differs. That correspondence is the check worth running, because it fails loudly if
-a change is made without recording it.
+Both figures describe that comparison and nothing wider. Files outside `services/`, `pb/`,
+and `LICENSE` are not part of it and are not classified by these counts.
+
+Inside the same scope, the notice correspondence covers the modified upstream-derived
+container definitions and `services/checkout/main.go`. Every one of them that differs
+carries a modification notice, and every one carrying a notice differs. `go.mod` and
+`go.sum` are excluded for the reason given in the preceding section, and the table there is
+what records them. That correspondence is the check worth running, because it fails loudly
+if a change is made without recording it.
