@@ -9,7 +9,7 @@
   SERVICE_PATH: services/frontend
   LANG_TIER: node
 
-.adolint:
+frontend:lint-dockerfile:
   extends: .hadolint-template
   variables:
     <<: *frontend-vars
