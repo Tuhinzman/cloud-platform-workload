@@ -30,9 +30,9 @@ project owns, and how to reproduce the tree byte for byte.
 [UPSTREAM-EXCEPTIONS.md](UPSTREAM-EXCEPTIONS.md) records components deployed but not built
 here, each with a justification and the condition that would remove it.
 
-[SERVICE-INVENTORY.md](SERVICE-INVENTORY.md) is where per-component evidence will be
-reported. Its status columns are empty, because a filled-in inventory ahead of
-implementation would be a claim rather than a record.
+[SERVICE-INVENTORY.md](SERVICE-INVENTORY.md) is where per-component evidence is
+reported. Its status columns remain empty until corresponding per-component evidence
+is recorded.
 
 ## Current Status
 

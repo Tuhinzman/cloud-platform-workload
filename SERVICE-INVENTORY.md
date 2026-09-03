@@ -47,14 +47,15 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | .NET | accounting, cart | Net-new |
 | Java | ad, fraud-detection | Net-new |
 | Python | product-reviews, recommendation | Net-new |
-| Rust | shipping | Net-new |
+| Rust | shipping | `ci/templates/lang-rust.yml`, net-new |
 | Ruby | email | Net-new |
-| PHP | quote | Net-new |
+| PHP | quote | `ci/templates/lang-php.yml`, net-new |
 | C++ | currency | Net-new |
 | Elixir | flagd-ui | Net-new |
 
-Two tiers of ten have a template today. Eight are net-new work. Four services are wired to
-the pipeline, and eleven are not, because their tier has no template yet.
+Four tiers of ten have a template today. Six tiers still require net-new templates. Six
+services are wired to the pipeline, and nine are not because their tier does not yet have
+a template.
 
 ## 2. Project-Built Configured Components
 
