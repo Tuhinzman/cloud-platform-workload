@@ -40,8 +40,18 @@ Nothing is implemented. No image has been built, no scan has run, no SBOM exists
 artifact has been published, and no cluster has run any of this.
 
 Twenty-two container definitions are modified, each carrying an Apache-2.0 modification
-notice. Everything else, including all application source and the protobuf contract, is
-byte-identical to the pinned upstream release.
+notice. They are adapted deliberately, for this repository's build layout and for the
+platform work this workload exists to exercise.
+
+Beyond those, `checkout` carries project modifications to its application source and its Go
+dependency metadata. Every other upstream-derived file in the compared scope, including all
+remaining application source and the protobuf contract, is byte-identical to the pinned
+upstream release. That scope is `services/`, `pb/` and `LICENSE`, and the comparison makes
+no claim about files outside it.
+
+Upstream wrote this application and none of it is claimed as this project's work.
+[DERIVATION.md](DERIVATION.md) is the per-file record of what differs and how to reproduce
+the tree.
 
 The pipeline runs real static validation today for Dockerfiles, Go, and TypeScript, across
 four services in the two language tiers whose templates exist. Building, scanning,
