@@ -9,7 +9,7 @@ FROM --platform=${BUILDPLATFORM} gradle:8-jdk17 AS builder
 WORKDIR /usr/src/app/
 
 COPY ./services/fraud-detection/ ./
-COPY ./pb/ ./services/main/proto/
+COPY ./pb/ ./src/main/proto/
 
 RUN gradle shadowJar
 
