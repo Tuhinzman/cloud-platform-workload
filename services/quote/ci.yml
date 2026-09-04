@@ -39,13 +39,19 @@ quote:build:
   variables:
     <<: *quote-vars
 
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
 quote:scan-image:
   extends: .trivy-scan-template
+  dependencies:
+    - quote:build
   variables:
     <<: *quote-vars
 
 quote:health-test:
   extends: .image-health-template
+  dependencies:
+    - quote:build
   variables:
     <<: *quote-vars
     HEALTH_PORT: "8080"

@@ -43,13 +43,19 @@ shipping:build:
   variables:
     <<: *shipping-vars
 
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
 shipping:scan-image:
   extends: .trivy-scan-template
+  dependencies:
+    - shipping:build
   variables:
     <<: *shipping-vars
 
 shipping:health-test:
   extends: .image-health-template
+  dependencies:
+    - shipping:build
   variables:
     <<: *shipping-vars
     HEALTH_PORT: "8080"

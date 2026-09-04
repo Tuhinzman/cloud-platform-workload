@@ -33,13 +33,19 @@ checkout:build:
   variables:
     <<: *checkout-vars
 
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
 checkout:scan-image:
   extends: .trivy-scan-template
+  dependencies:
+    - checkout:build
   variables:
     <<: *checkout-vars
 
 checkout:health-test:
   extends: .image-health-template
+  dependencies:
+    - checkout:build
   variables:
     <<: *checkout-vars
     HEALTH_PORT: "8080"
