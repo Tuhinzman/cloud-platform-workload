@@ -45,9 +45,10 @@ notice. They are adapted deliberately, for this repository's build layout and fo
 platform work this workload exists to exercise.
 
 Beyond those, `checkout` carries project modifications to its application source and its Go
-dependency metadata. Every other upstream-derived file in the compared scope, including all
-remaining application source and the protobuf contract, is byte-identical to the pinned
-upstream release. That scope is `services/`, `pb/` and `LICENSE`, and the comparison makes
+dependency metadata, `shipping` to its application source, and `quote` to its dependency
+metadata. Every other upstream-derived file in the compared scope, including all remaining
+application source and the protobuf contract, is byte-identical to the pinned upstream
+release. That scope is `services/`, `pb/` and `LICENSE`, and the comparison makes
 no claim about files outside it.
 
 Upstream wrote this application and none of it is claimed as this project's work.

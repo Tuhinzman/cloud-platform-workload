@@ -94,7 +94,7 @@ exactly as upstream wrote them.
 | `services/frontend/Dockerfile.cypress` | frontend | Path-only modified |
 | **`services/product-catalog/Dockerfile`** | **product-catalog** | **Path-only modified** |
 | `services/product-catalog/genproto/Dockerfile` | product-catalog | Path-only modified |
-| `services/quote/Dockerfile` | quote | Path-only modified |
+| `services/quote/Dockerfile` | quote | Path plus hardening |
 | `services/shipping/Dockerfile` | shipping | Path-only modified |
 | `services/product-reviews/genproto/Dockerfile` | product-reviews | Upstream unchanged |
 | `services/recommendation/genproto/Dockerfile` | recommendation | Upstream unchanged |
@@ -121,26 +121,33 @@ the pipeline harder to share than the problem it solves.
 
 ### Modified upstream files that are not container definitions
 
-The table above covers container definitions. Three upstream-derived files under
-`services/checkout/` also differ from the pinned source, and they are recorded here so the
-modification inventory is not limited to container definitions. The checkout application
-remains upstream work. What follows are corrections and dependency movement applied on top
-of it, not authorship of the service.
+The table above covers container definitions. Five upstream-derived files under
+`services/checkout/`, `services/shipping/`, and `services/quote/` also differ from the
+pinned source, and they are recorded here so the modification inventory is not limited to
+container definitions. Those applications remain upstream work. What follows are
+corrections and dependency movement applied on top of them, not authorship of the
+services.
 
 | File | Kind | Change measured against the pinned source |
 |---|---|---|
 | `services/checkout/main.go` | Application source | Three static-analysis corrections, each already stated in the file's own modification notice: `status.Errorf` replaced with `status.Error` where the message is a non-constant string, which `go vet` rejects as a non-constant format string; the error returned by `openfeature.SetProvider` explicitly discarded rather than silently dropped; and the receive from the Kafka `Successes()` channel no longer assigned to the blank identifier. Applied in `348490c`. |
-| `services/checkout/go.mod` | Dependency and toolchain metadata | The `go` directive raised from `1.24.2` to `1.25.0`, direct dependencies advanced, and the indirect set re-resolved as a consequence. Applied in `a384c3d` and `bf07e2e`. |
-| `services/checkout/go.sum` | Dependency checksum metadata | The checksum lines corresponding to the `go.mod` change above, touching thirty-five distinct module paths. Applied in the same two changes. |
+| `services/checkout/go.mod` | Dependency and toolchain metadata | The `go` directive raised from `1.24.2` to `1.25.0`, direct dependencies advanced, and the indirect set re-resolved as a consequence, in `a384c3d` and `bf07e2e`. Later remediation in `14d12f3` advanced `google.golang.org/grpc` to `1.83.1`, `golang.org/x/crypto` to `0.55.0`, `golang.org/x/mod` to `0.40.0`, and the OpenTelemetry Go modules to `1.44.0`, with the consequential indirect movement that re-resolution produced. |
+| `services/checkout/go.sum` | Dependency checksum metadata | Checksum metadata corresponding to the dependency changes recorded above. Applied in `a384c3d`, `bf07e2e`, and `14d12f3`. The earlier `a384c3d` and `bf07e2e` pair touched thirty-five distinct module paths. |
+| `services/shipping/src/shipping_service.rs` | Application source | Byte-identical to the pinned release until `9406cac`, verified against the upstream blob. That change removed an unnecessary `as u32` cast on an item quantity that is already `u32`, and initialised the required `address` and `items` fields of the `ShipOrderRequest` test fixture, which the upstream literal left empty. |
+| `services/quote/composer.json` | Dependency metadata | `1b4deb0` moved `guzzlehttp/guzzle` from `7.10.0` to `7.15.2` to clear the HIGH-severity finding the image scan reported against it. No other dependency changed. |
 
-The two dependency changes were made to move off modules the image scan reported findings
-against, which is the reason recorded in `a384c3d` and `bf07e2e`. Neither the changes nor
-this record claims any review of those dependencies beyond that.
+Every dependency change above was made to move off modules the image scan reported
+findings against, which is the reason recorded in `a384c3d`, `bf07e2e`, `14d12f3`, and
+`1b4deb0`. Neither the changes nor this record claims any review of those dependencies
+beyond that.
 
-`main.go` carries an Apache-2.0 modification notice in the format described below. `go.mod`
-and `go.sum` carry none, and none is added: `go.sum` has no comment syntax, neither file
-carries an upstream copyright or licence header for a notice to sit beneath, and both are
-resolver-generated metadata rather than authored source. This table is the record of their
+`main.go` and `shipping_service.rs` carry an Apache-2.0 modification notice in the format
+described below. `go.mod`, `go.sum`, and `composer.json` carry none, and none is added.
+`go.sum` is a line-oriented checksum list with no comment syntax, and `composer.json` is
+strict JSON, which rejects comments outright, so neither can hold one. `go.mod` does
+support `//` comments, but like the other two it carries no upstream copyright or licence
+header for a notice to sit beneath, and all three are dependency metadata maintained by
+their resolvers rather than authored source. This table is the record of their
 modification.
 
 ### Hardening applied, by component
@@ -154,6 +161,7 @@ modification.
 | image-provider | Packages upgraded in a temporary privileged stage, served content given explicit ownership and read permissions, returns to the unprivileged nginx user |
 | payment | Application files and dependencies owned by the unprivileged runtime user |
 | product-reviews | Base packages upgraded |
+| quote | Vulnerable runtime packages pinned to measured fixed revisions rather than upgraded broadly |
 | recommendation | TLS libraries upgraded, application directories given explicit read permissions |
 | frontend-proxy | Base image pinned to an immutable digest, package installation narrowed, TLS libraries added, configuration template given explicit ownership and read-only permissions |
 
@@ -177,6 +185,15 @@ below the retained upstream copyright and SPDX headers:
 
 Each newly changed file gains its notice in the same change that modifies it, and the table
 above is updated in the same change, so the two never drift.
+
+That rule was not followed twice. `9406cac` modified
+`services/shipping/src/shipping_service.rs` without adding the notice or recording the file
+above, and `1b4deb0` modified `services/quote/composer.json` without recording it above,
+which matters more there because JSON has no comment syntax, so the table is the only place
+that file can be recorded. Both gaps were found by comparing this record against the
+measured tree and are closed above. The rule itself is unchanged: a file whose syntax
+supports a comment carries the notice, and dependency metadata that cannot appropriately
+carry one is recorded in the non-container table instead.
 
 ## Language Tiers
 
@@ -335,22 +352,26 @@ git show 2.2.0:LICENSE > ../out/LICENSE
 ```
 
 The comparison scope is `services/`, `pb/`, and `LICENSE`. Within that scope, comparing
-`../out` against this tree reports two kinds of difference and nothing else. Twenty-five
+`../out` against this tree reports two kinds of difference and nothing else. Twenty-seven
 upstream-derived files differ in content: the twenty-two container definitions recorded as
-modified above, plus `services/checkout/main.go`, `services/checkout/go.mod`, and
-`services/checkout/go.sum`, which the preceding section records. Those three are what
-separates this result from the earlier twenty-two figure, which counted modified container
-definitions only. Six files are present here and absent upstream: the per-service `ci.yml`
-under `checkout`, `product-catalog`, `frontend`, `payment`, `shipping`, and `quote`. Those
-six are project-added pipeline configuration with no upstream origin, so no modification
-notice applies to them.
+modified above, plus the five the preceding section records, `services/checkout/main.go`,
+`services/checkout/go.mod`, `services/checkout/go.sum`,
+`services/shipping/src/shipping_service.rs`, and `services/quote/composer.json`. Those five
+are what separates this result from the twenty-two figure, which counts modified container
+definitions only. The remaining three hundred and twenty-five upstream-derived files in the
+scope are byte-identical, and no upstream file in the scope is missing here. Six files are
+present here and absent upstream: the per-service `ci.yml` under `checkout`,
+`product-catalog`, `frontend`, `payment`, `shipping`, and `quote`. Those six are
+project-added pipeline configuration with no upstream origin, so no modification notice
+applies to them.
 
-Both figures describe that comparison and nothing wider. Files outside `services/`, `pb/`,
+Those figures describe that comparison and nothing wider. Files outside `services/`, `pb/`,
 and `LICENSE` are not part of it and are not classified by these counts.
 
 Inside the same scope, the notice correspondence covers the modified upstream-derived
-container definitions and `services/checkout/main.go`. Every one of them that differs
-carries a modification notice, and every one carrying a notice differs. `go.mod` and
-`go.sum` are excluded for the reason given in the preceding section, and the table there is
-what records them. That correspondence is the check worth running, because it fails loudly
-if a change is made without recording it.
+container definitions, `services/checkout/main.go`, and
+`services/shipping/src/shipping_service.rs`. Every one of them that differs carries a
+modification notice, and every one carrying a notice differs. `go.mod`, `go.sum`, and
+`composer.json` are excluded for the reason given in the preceding section, and the table
+there is what records them. That correspondence is the check worth running, because it
+fails loudly if a change is made without recording it.

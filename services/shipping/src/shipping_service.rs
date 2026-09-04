@@ -1,6 +1,12 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: the item quantity sum no longer casts each quantity with as u32, because
+// the field is already u32 and the cast is redundant.
+// Change: the ShipOrderRequest test fixture initialises the required address and
+// items fields rather than constructing an empty struct literal.
+
 use actix_web::{post, web, HttpResponse, Responder};
 use tracing::info;
 

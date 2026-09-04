@@ -32,7 +32,7 @@ hardening, the pipeline, and the evidence.
 | payment | TypeScript | `src/payment` | Path plus hardening | None |
 | product-catalog | Go | `src/product-catalog` | Path-only modified | None |
 | product-reviews | Python | `src/product-reviews` | Path plus hardening | None |
-| quote | PHP | `src/quote` | Path-only modified | None |
+| quote | PHP | `src/quote` | Path plus hardening | None |
 | recommendation | Python | `src/recommendation` | Path plus hardening | None |
 | shipping | Rust | `src/shipping` | Path-only modified | None |
 
