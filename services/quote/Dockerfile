@@ -3,6 +3,8 @@
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout.
+# Change: vulnerable Alpine runtime packages are pinned to measured fixed revisions so the
+# HIGH-severity OS findings reported by the image scan are removed without a broad upgrade.
 
 FROM ghcr.io/mlocati/php-extension-installer:2.9.11 AS installer
 
@@ -21,6 +23,12 @@ RUN composer install \
     --prefer-dist
 
 FROM docker.io/library/php:8.4-cli-alpine3.22
+
+RUN apk add --no-cache \
+        c-ares=1.34.8-r0 \
+        libcrypto3=3.5.8-r0 \
+        libssl3=3.5.8-r0 \
+        openssl=3.5.8-r0
 
 COPY --from=installer /usr/bin/install-php-extensions /usr/local/bin/
 
