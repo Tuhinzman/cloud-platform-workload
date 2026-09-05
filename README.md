@@ -57,8 +57,11 @@ the tree.
 
 The pipeline now has shared templates for Go, Node/TypeScript, PHP, and Rust, but validation
 coverage is not uniform across the fleet. Checkout has an executed and passing Dockerfile
-lint path. Shipping, quote, frontend, payment, and product-catalog declare executable Dockerfile-lint
-jobs, but their pipelines have not yet been executed.
+lint path. Shipping and quote have executed validated build, scan, SBOM, and container
+health paths. Frontend, payment, and product-catalog have executed lint-only pipelines.
+Their language-lint jobs remain non-blocking: product-catalog reports golangci-lint
+findings, while frontend and payment exit before lint findings are produced because
+neither carries an ESLint flat configuration.
 
 Checkout has also completed build, scan, SBOM, and artifact-publication stages. Those
 stages are not yet evidenced fleet-wide, and promotion remains a separate implementation
