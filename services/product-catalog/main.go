@@ -1,5 +1,10 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
+
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: status.Errorf replaced with status.Error where the message is a
+// non-constant string, which go vet rejects as a non-constant format string.
+
 package main
 
 //go:generate go install google.golang.org/protobuf/cmd/protoc-gen-go
@@ -440,7 +445,7 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 		msg := "Error: Product Catalog Fail Feature Flag Enabled"
 		span.SetStatus(otelcodes.Error, msg)
 		span.AddEvent(msg)
-		return nil, status.Errorf(codes.Internal, msg)
+		return nil, status.Error(codes.Internal, msg)
 	}
 
 	found, err := getProductFromDB(ctx, req.Id)
@@ -448,7 +453,7 @@ func (p *productCatalog) GetProduct(ctx context.Context, req *pb.GetProductReque
 		msg := fmt.Sprintf("Product Not Found: %s", req.Id)
 		span.SetStatus(otelcodes.Error, msg)
 		span.AddEvent(msg)
-		return nil, status.Errorf(codes.NotFound, msg)
+		return nil, status.Error(codes.NotFound, msg)
 	}
 
 	span.AddEvent("Product Found")

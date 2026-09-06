@@ -121,18 +121,19 @@ the pipeline harder to share than the problem it solves.
 
 ### Modified upstream files that are not container definitions
 
-The table above covers container definitions. Five upstream-derived files under
-`services/checkout/`, `services/shipping/`, and `services/quote/` also differ from the
-pinned source, and they are recorded here so the modification inventory is not limited to
-container definitions. Those applications remain upstream work. What follows are
-corrections and dependency movement applied on top of them, not authorship of the
-services.
+The table above covers container definitions. Six upstream-derived files under
+`services/checkout/`, `services/product-catalog/`, `services/shipping/`, and
+`services/quote/` also differ from the pinned source, and they are recorded here so the
+modification inventory is not limited to container definitions. Those applications remain
+upstream work. What follows are corrections and dependency movement applied on top of them,
+not authorship of the services.
 
 | File | Kind | Change measured against the pinned source |
 |---|---|---|
 | `services/checkout/main.go` | Application source | Three static-analysis corrections, each already stated in the file's own modification notice: `status.Errorf` replaced with `status.Error` where the message is a non-constant string, which `go vet` rejects as a non-constant format string; the error returned by `openfeature.SetProvider` explicitly discarded rather than silently dropped; and the receive from the Kafka `Successes()` channel no longer assigned to the blank identifier. Applied in `348490c`. |
 | `services/checkout/go.mod` | Dependency and toolchain metadata | The `go` directive raised from `1.24.2` to `1.25.0`, direct dependencies advanced, and the indirect set re-resolved as a consequence, in `a384c3d` and `bf07e2e`. Later remediation in `14d12f3` advanced `google.golang.org/grpc` to `1.83.1`, `golang.org/x/crypto` to `0.55.0`, `golang.org/x/mod` to `0.40.0`, and the OpenTelemetry Go modules to `1.44.0`, with the consequential indirect movement that re-resolution produced. |
 | `services/checkout/go.sum` | Dependency checksum metadata | Checksum metadata corresponding to the dependency changes recorded above. Applied in `a384c3d`, `bf07e2e`, and `14d12f3`. The earlier `a384c3d` and `bf07e2e` pair touched thirty-five distinct module paths. |
+| `services/product-catalog/main.go` | Application source | One static-analysis correction, stated in the file's own modification notice: `status.Errorf` replaced with `status.Error` at the two call sites where the message is a non-constant string, which `go vet` rejects as a non-constant format string. The three remaining `status.Errorf` calls in the file pass constant format strings and are unchanged. Recorded in the same change that applies it, so no earlier commit is cited. |
 | `services/shipping/src/shipping_service.rs` | Application source | Byte-identical to the pinned release until `9406cac`, verified against the upstream blob. That change removed an unnecessary `as u32` cast on an item quantity that is already `u32`, and initialised the required `address` and `items` fields of the `ShipOrderRequest` test fixture, which the upstream literal left empty. |
 | `services/quote/composer.json` | Dependency metadata | `1b4deb0` moved `guzzlehttp/guzzle` from `7.10.0` to `7.15.2` to clear the HIGH-severity finding the image scan reported against it. No other dependency changed. |
 
@@ -141,14 +142,13 @@ findings against, which is the reason recorded in `a384c3d`, `bf07e2e`, `14d12f3
 `1b4deb0`. Neither the changes nor this record claims any review of those dependencies
 beyond that.
 
-`main.go` and `shipping_service.rs` carry an Apache-2.0 modification notice in the format
-described below. `go.mod`, `go.sum`, and `composer.json` carry none, and none is added.
-`go.sum` is a line-oriented checksum list with no comment syntax, and `composer.json` is
-strict JSON, which rejects comments outright, so neither can hold one. `go.mod` does
+Both `main.go` files and `shipping_service.rs` carry an Apache-2.0 modification notice in
+the format described below. `go.mod`, `go.sum`, and `composer.json` carry none, and none is
+added. `go.sum` is a line-oriented checksum list with no comment syntax, and `composer.json`
+is strict JSON, which rejects comments outright, so neither can hold one. `go.mod` does
 support `//` comments, but like the other two it carries no upstream copyright or licence
 header for a notice to sit beneath, and all three are dependency metadata maintained by
-their resolvers rather than authored source. This table is the record of their
-modification.
+their resolvers rather than authored source. This table is the record of their modification.
 
 ### Hardening applied, by component
 
@@ -352,13 +352,13 @@ git show 2.2.0:LICENSE > ../out/LICENSE
 ```
 
 The comparison scope is `services/`, `pb/`, and `LICENSE`. Within that scope, comparing
-`../out` against this tree reports two kinds of difference and nothing else. Twenty-seven
+`../out` against this tree reports two kinds of difference and nothing else. Twenty-eight
 upstream-derived files differ in content: the twenty-two container definitions recorded as
-modified above, plus the five the preceding section records, `services/checkout/main.go`,
-`services/checkout/go.mod`, `services/checkout/go.sum`,
-`services/shipping/src/shipping_service.rs`, and `services/quote/composer.json`. Those five
+modified above, plus the six the preceding section records, `services/checkout/main.go`,
+`services/checkout/go.mod`, `services/checkout/go.sum`, `services/product-catalog/main.go`,
+`services/shipping/src/shipping_service.rs`, and `services/quote/composer.json`. Those six
 are what separates this result from the twenty-two figure, which counts modified container
-definitions only. The remaining three hundred and twenty-five upstream-derived files in the
+definitions only. The remaining three hundred and twenty-four upstream-derived files in the
 scope are byte-identical, and no upstream file in the scope is missing here. Six files are
 present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, and `quote`. Those six are
@@ -369,7 +369,7 @@ Those figures describe that comparison and nothing wider. Files outside `service
 and `LICENSE` are not part of it and are not classified by these counts.
 
 Inside the same scope, the notice correspondence covers the modified upstream-derived
-container definitions, `services/checkout/main.go`, and
+container definitions, `services/checkout/main.go`, `services/product-catalog/main.go`, and
 `services/shipping/src/shipping_service.rs`. Every one of them that differs carries a
 modification notice, and every one carrying a notice differs. `go.mod`, `go.sum`, and
 `composer.json` are excluded for the reason given in the preceding section, and the table
