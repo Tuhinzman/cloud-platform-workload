@@ -1,8 +1,7 @@
 # Node static validation.
 #
 # Two templates, because the services in this tier do not declare the same validation
-# tooling. Each service opts into only the assertions its source tree can legitimately
-# support.
+# tooling. Each service opts into only the assertions its source tree declares tooling for.
 #
 # npx is given --no so it runs only a binary the service's own install tree already
 # provides. Without it a missing package is treated as an instruction to fetch one, and the
@@ -27,7 +26,7 @@
 # lang-php.yml takes the same position for the same reason.
 #
 # node --check is the parse step of the runtime, so it fails on any file the runtime could
-# not load. It resolves no require, so the check needs no installed dependencies and none
+# not parse. It resolves no require, so the check needs no installed dependencies and none
 # are installed. -n1 keeps one file per invocation, because node --check reports only the
 # first file it is given. The list is written and then tested rather than piped, because an
 # empty list would otherwise pass an assertion that ran against nothing.

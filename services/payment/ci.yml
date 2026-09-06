@@ -16,12 +16,9 @@ payment:lint-dockerfile:
 
 # payment is plain JavaScript and declares no linter, so it extends the parse template
 # rather than the lint and type-check one. What a passing result asserts is narrow: every
-# JavaScript file in the service directory parses. It says nothing about undefined
-# identifiers, unused bindings, or anything else a linter reports.
-#
-# Non-blocking until the first run of the corrected job has been measured.
+# .js file in the service directory parses. It says nothing about undefined identifiers,
+# unused bindings, or anything else a linter reports.
 payment:lint-node:
   extends: .lang-node-parse-template
-  allow_failure: true
   variables:
     <<: *payment-vars
