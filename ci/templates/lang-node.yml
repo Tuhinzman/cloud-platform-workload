@@ -1,4 +1,14 @@
-# TypeScript and Node static validation.
+# Node static validation.
+#
+# Two templates, because the services in this tier do not declare the same validation
+# tooling. Each service opts into only the assertions its source tree can legitimately
+# support.
+#
+# npx is given --no so it runs only a binary the service's own install tree already
+# provides. Without it a missing package is treated as an instruction to fetch one, and the
+# job then validates against a version no service declares and no lock file pins. The
+# pinning itself comes from the committed package-lock.json that npm ci installs; --no only
+# removes the fallback that made the pinning optional.
 
 .lang-node-template:
   stage: lint
@@ -6,7 +16,29 @@
   script:
     - cd "${SERVICE_PATH}"
     - npm ci --no-audit --no-fund
-    - npx eslint .
-    - npx tsc --noEmit
+    - npx --no eslint .
+    - npx --no tsc --noEmit
   rules:
-    - changes: ["${SERVICE_PATH}/**", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+
+# For a Node service that declares no static-analysis tooling of its own. Extending the
+# template above from such a service would report on a configuration that exists nowhere in
+# the repository, and installing a linter here would add a control the service does not own.
+# lang-php.yml takes the same position for the same reason.
+#
+# node --check is the parse step of the runtime, so it fails on any file the runtime could
+# not load. It resolves no require, so the check needs no installed dependencies and none
+# are installed. -n1 keeps one file per invocation, because node --check reports only the
+# first file it is given. The list is written and then tested rather than piped, because an
+# empty list would otherwise pass an assertion that ran against nothing.
+
+.lang-node-parse-template:
+  stage: lint
+  image: node:22-alpine
+  script:
+    - cd "${SERVICE_PATH}"
+    - find . -name '*.js' -print0 > /tmp/js-files
+    - test -s /tmp/js-files
+    - xargs -0 -n1 node --check < /tmp/js-files
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]

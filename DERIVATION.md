@@ -203,7 +203,7 @@ base images.
 | Tier | Services | Evidence at the pinned tag | Pipeline template |
 |---|---|---|---|
 | Go | checkout, product-catalog | `go.mod` | `ci/templates/lang-go.yml`, carried |
-| TypeScript | frontend, payment | `package.json` | `ci/templates/lang-node.yml`, carried |
+| Node | frontend, payment | `package.json` | `ci/templates/lang-node.yml` |
 | .NET | accounting, cart | `Accounting.csproj`, `cart.sln` | Net-new |
 | Java | ad, fraud-detection | `build.gradle`, `build.gradle.kts` | Net-new |
 | Python | product-reviews, recommendation | `requirements.txt` | Net-new |
@@ -278,7 +278,7 @@ container registry, and a personal image namespace.
 | Stage order in `.gitlab-ci.yml` | Prior project root pipeline | Matches the stage sequence ADR-0009 requires and carries no environment assumption |
 | `ci/templates/hadolint.yml` | Prior project | Reusable Dockerfile linting template for the delivery model. Not yet extended by a job, so it does not execute today |
 | `ci/templates/lang-go.yml` | Prior project | Module download, lint, and compile check. Runs today against checkout and product-catalog |
-| `ci/templates/lang-node.yml` | Prior project | Dependency install, lint, and type check. Runs today against frontend and payment |
+| `ci/templates/lang-node.yml` | Prior project | Dependency install, lint, and type check, carried and extended today by frontend alone. The type check runs after the lint in the same script, so it is reached only when the lint passes. The JavaScript parse template beside it is project-added rather than carried, because payment declares no static-analysis tooling for the carried template to run |
 | `ci/templates/trivy-scan.yml` | Prior project | The two-pass order is the reason it is carried. Pass one always writes findings as an artifact and pass two applies the gate, so a blocked pipeline still leaves triage evidence behind |
 
 ### Four carried per-service definitions
@@ -287,8 +287,8 @@ container registry, and a personal image namespace.
 |---|---|---|---|
 | `services/checkout/ci.yml` | checkout | Go | Structure follows the prior project's per-service configuration contract. Carried because the Go tier template exists, so these jobs run |
 | `services/product-catalog/ci.yml` | product-catalog | Go | Same contract. This component was one of two the prior project had onboarded, so this configuration pattern had already been exercised in the prior project |
-| `services/frontend/ci.yml` | frontend | TypeScript | Same contract. The other component the prior project had onboarded |
-| `services/payment/ci.yml` | payment | TypeScript | Same contract. Carried because the TypeScript tier template exists |
+| `services/frontend/ci.yml` | frontend | Node | Same contract. The other component the prior project had onboarded |
+| `services/payment/ci.yml` | payment | Node | Same contract. Carried because the Node tier template exists. It extends the parse template rather than the lint and type-check one, because the service declares no linter |
 
 Each declares `SERVICE_NAME`, `SERVICE_PATH`, and `LANG_TIER` only. The prior project's
 per-service files also carried `IMAGE_REPO` and `PROMOTE_REPO` pointing at its own registry

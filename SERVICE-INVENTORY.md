@@ -28,8 +28,8 @@ hardening, the pipeline, and the evidence.
 | email | Ruby | `src/email` | Path plus hardening | None |
 | flagd-ui | Elixir | `src/flagd-ui` | Path plus hardening | Unit and controller, seven files |
 | fraud-detection | Java | `src/fraud-detection` | Path-only modified | None |
-| frontend | TypeScript | `src/frontend` | Path-only modified | Cypress harness configuration |
-| payment | TypeScript | `src/payment` | Path plus hardening | None |
+| frontend | Node | `src/frontend` | Path-only modified | Cypress harness configuration |
+| payment | Node | `src/payment` | Path plus hardening | None |
 | product-catalog | Go | `src/product-catalog` | Path-only modified | None |
 | product-reviews | Python | `src/product-reviews` | Path plus hardening | None |
 | quote | PHP | `src/quote` | Path plus hardening | None |
@@ -43,7 +43,7 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | Tier | Services | Pipeline template |
 |---|---|---|
 | Go | checkout, product-catalog | `ci/templates/lang-go.yml`, carried |
-| TypeScript | frontend, payment | `ci/templates/lang-node.yml`, carried |
+| Node | frontend, payment | `ci/templates/lang-node.yml` |
 | .NET | accounting, cart | Net-new |
 | Java | ad, fraud-detection | Net-new |
 | Python | product-reviews, recommendation | Net-new |

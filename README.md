@@ -55,14 +55,15 @@ Upstream wrote this application and none of it is claimed as this project's work
 [DERIVATION.md](DERIVATION.md) is the per-file record of what differs and how to reproduce
 the tree.
 
-The pipeline now has shared templates for Go, Node/TypeScript, PHP, and Rust, but validation
+The pipeline now has shared templates for Go, Node, PHP, and Rust, but validation
 coverage is not uniform across the fleet. Checkout has an executed and passing Dockerfile
 lint path. Shipping and quote have executed validated build, scan, SBOM, and container
 health paths. Frontend, payment, and product-catalog have executed lint-only pipelines.
 The product-catalog Go lint job is now configured as blocking and its latest validated run
-reports no findings, while the frontend and payment language-lint jobs remain non-blocking
-and exit before lint findings are produced because neither carries an ESLint flat
-configuration.
+reports no findings. The frontend and payment jobs remain non-blocking. payment declares no
+linter and no TypeScript, so it now extends a Node parse check rather than a lint, which
+asserts only that every JavaScript file in the service directory parses. frontend still
+exits before lint findings are produced, because it carries no ESLint flat configuration.
 
 Checkout has also completed build, scan, SBOM, and artifact-publication stages. Those
 stages are not yet evidenced fleet-wide, and promotion remains a separate implementation

@@ -14,12 +14,14 @@ payment:lint-dockerfile:
   variables:
     <<: *payment-vars
 
-# Non-blocking, not ignored: the job still runs and still reports its findings. Those
-# findings are pre-existing and outside Phase 6 Slice 3, and remediating them remains
-# required when this service is wired. The setting exists only so unrelated service debt
-# does not prevent checkout first-digest validation.
+# payment is plain JavaScript and declares no linter, so it extends the parse template
+# rather than the lint and type-check one. What a passing result asserts is narrow: every
+# JavaScript file in the service directory parses. It says nothing about undefined
+# identifiers, unused bindings, or anything else a linter reports.
+#
+# Non-blocking until the first run of the corrected job has been measured.
 payment:lint-node:
-  extends: .lang-node-template
+  extends: .lang-node-parse-template
   allow_failure: true
   variables:
     <<: *payment-vars
