@@ -1,8 +1,4 @@
 # Declarative configuration for product-catalog. Behaviour lives in ci/templates.
-#
-# IMAGE_REPO is deliberately absent. It resolves to the platform registry, and that
-# coordinate does not exist yet, so the scan job stays inactive rather than pointing
-# somewhere wrong.
 
 .product-catalog-vars: &product-catalog-vars
   SERVICE_NAME: product-catalog
@@ -14,12 +10,7 @@ product-catalog:lint-dockerfile:
   variables:
     <<: *product-catalog-vars
 
-# Non-blocking, not ignored: the job still runs and still reports its findings. Those
-# findings are pre-existing and outside Phase 6 Slice 3, and remediating them remains
-# required when this service is wired. The setting exists only so unrelated service debt
-# does not prevent checkout first-digest validation.
 product-catalog:lint-go:
   extends: .lang-go-template
-  allow_failure: true
   variables:
     <<: *product-catalog-vars
