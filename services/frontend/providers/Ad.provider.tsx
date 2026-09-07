@@ -1,10 +1,13 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: the unused Money import specifier was removed.
+
 import { createContext, useContext, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ApiGateway from '../gateways/Api.gateway';
-import { Ad, Money, Product } from '../protos/demo';
+import { Ad, Product } from '../protos/demo';
 import { useCurrency } from './Currency.provider';
 
 interface IContext {

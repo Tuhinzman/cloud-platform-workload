@@ -1,6 +1,9 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: remainder is never reassigned, so let became const.
+
 import * as S from './ProductReviews.styled';
 import { useProductReview } from '../../providers/ProductReview.provider';
 import { useAiAssistant } from '../../providers/ProductAIAssistant.provider';
@@ -39,7 +42,7 @@ const ProductReviews = () => {
         const raw = distribution.map(c => (c / productReviews.length) * 100);
         const floored = raw.map(p => Math.floor(p));
         const sumFloors = floored.reduce((a, b) => a + b, 0);
-        let remainder = 100 - sumFloors;
+        const remainder = 100 - sumFloors;
 
         const order = raw
             .map((p, i) => ({ i, frac: p - Math.floor(p) }))

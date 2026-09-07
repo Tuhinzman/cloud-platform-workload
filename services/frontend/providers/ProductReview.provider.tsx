@@ -1,7 +1,10 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-import { createContext, useContext, useEffect, useMemo } from 'react';
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: the unused useEffect import specifier was removed.
+
+import { createContext, useContext, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ApiGateway from '../gateways/Api.gateway';
 import { ProductReview } from '../protos/demo';

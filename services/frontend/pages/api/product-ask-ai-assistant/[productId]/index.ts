@@ -1,9 +1,12 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: the unused AddItemRequest import specifier was removed.
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import InstrumentationMiddleware from '../../../../utils/telemetry/InstrumentationMiddleware';
-import {AddItemRequest, Empty} from '../../../../protos/demo';
+import {Empty} from '../../../../protos/demo';
 import ProductReviewService from '../../../../services/ProductReview.service';
 
 type TResponse = string | Empty;
