@@ -212,13 +212,13 @@ base images.
 | .NET | accounting, cart | `Accounting.csproj`, `cart.sln` | Net-new |
 | Java | ad, fraud-detection | `build.gradle`, `build.gradle.kts` | Net-new |
 | Python | product-reviews, recommendation | `requirements.txt` | Net-new |
-| Rust | shipping | `Cargo.toml` | Net-new |
+| Rust | shipping | `Cargo.toml` | `ci/templates/lang-rust.yml` |
 | Ruby | email | `Gemfile` | Net-new |
-| PHP | quote | `composer.json` | Net-new |
+| PHP | quote | `composer.json` | `ci/templates/lang-php.yml` |
 | C++ | currency | `CMakeLists.txt` | Net-new |
 | Elixir | flagd-ui | `mix.exs` | Net-new |
 
-Two tiers of ten have a template today. Eight are net-new work.
+Four tiers of ten have a template today. Six are net-new work.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
 upstream binary with project-owned configuration, so no language-tier template applies to
@@ -281,7 +281,7 @@ container registry, and a personal image namespace.
 | Carried artefact | Origin | Why it is valid here |
 |---|---|---|
 | Stage order in `.gitlab-ci.yml` | Prior project root pipeline | Matches the stage sequence ADR-0009 requires and carries no environment assumption |
-| `ci/templates/hadolint.yml` | Prior project | Reusable Dockerfile linting template for the delivery model. Not yet extended by a job, so it does not execute today |
+| `ci/templates/hadolint.yml` | Prior project | Reusable Dockerfile linting template for the delivery model. Extended by every wired service, so its jobs execute today |
 | `ci/templates/lang-go.yml` | Prior project | Module download, lint, and compile check. Runs today against checkout and product-catalog |
 | `ci/templates/lang-node.yml` | Prior project | Dependency install, lint, and type check, carried and extended today by frontend alone. The type check runs after the lint in the same script, so it is reached only when the lint passes. The JavaScript parse template beside it is project-added rather than carried, because payment declares no static-analysis tooling for the carried template to run |
 | `ci/templates/trivy-scan.yml` | Prior project | The two-pass order is the reason it is carried. Pass one always writes findings as an artifact and pass two applies the gate, so a blocked pipeline still leaves triage evidence behind |
@@ -297,17 +297,20 @@ container registry, and a personal image namespace.
 
 Each declares `SERVICE_NAME`, `SERVICE_PATH`, and `LANG_TIER` only. The prior project's
 per-service files also carried `IMAGE_REPO` and `PROMOTE_REPO` pointing at its own registry
-and a personal image namespace. Neither is carried, and no registry coordinate is invented
-in their place, so the scan job stays inactive rather than pointing somewhere wrong.
+and a personal image namespace. Neither is carried, and no registry coordinate is written into these files: the
+account-bearing host and the role arrive as masked CI variables instead. Where a service
+has no repository in the platform registry, as `product-catalog`, `frontend`, and
+`payment` do not, its image jobs stay unwired rather than pointing somewhere wrong.
 
-Thirteen components have no per-service configuration yet, because their language tier has
-no template.
+Eleven components have no per-service configuration yet: nine because their language tier
+has no template, and `frontend-proxy` and `image-provider` because they have no
+application language.
 
 ### Deferred work
 
 Net-new implementation with nothing to carry forward:
 
-- Language-tier templates for .NET, Java, Python, Rust, Ruby, PHP, C++, and Elixir.
+- Language-tier templates for .NET, Java, Python, Ruby, C++, and Elixir.
 - The build stage. The runner executor model is undecided, and the prior project's approach
   depended on infrastructure assumptions that do not transfer.
 - Publication to the platform registry, federated pipeline credentials, and SBOM

@@ -1,8 +1,8 @@
 # Declarative configuration for frontend. Behaviour lives in ci/templates.
 #
-# IMAGE_REPO is deliberately absent. It resolves to the platform registry, and that
-# coordinate does not exist yet, so the scan job stays inactive rather than pointing
-# somewhere wrong.
+# IMAGE_REPO is deliberately absent. The platform registry exists, but frontend has no
+# repository in it and no publish path, so the image jobs stay unwired rather than
+# pointing somewhere wrong.
 
 .frontend-vars: &frontend-vars
   SERVICE_NAME: frontend
