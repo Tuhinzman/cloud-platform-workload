@@ -359,11 +359,14 @@ modified above, plus the six the preceding section records, `services/checkout/m
 `services/shipping/src/shipping_service.rs`, and `services/quote/composer.json`. Those six
 are what separates this result from the twenty-two figure, which counts modified container
 definitions only. The remaining three hundred and twenty-four upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Six files are
-present here and absent upstream: the per-service `ci.yml` under `checkout`,
-`product-catalog`, `frontend`, `payment`, `shipping`, and `quote`. Those six are
-project-added pipeline configuration with no upstream origin, so no modification notice
-applies to them.
+scope are byte-identical, and no upstream file in the scope is missing here. Seven files
+are present here and absent upstream: the per-service `ci.yml` under `checkout`,
+`product-catalog`, `frontend`, `payment`, `shipping`, and `quote`, and
+`services/frontend/eslint.config.mjs`. Those seven are project-added configuration with
+no upstream origin, so no modification notice applies to them. The flat ESLint
+configuration is project-added rather than a modification because ESLint 9 reads flat
+configuration only and upstream ships none; the upstream `.eslintrc` beside it is
+retained unmodified and still counts among the byte-identical files.
 
 Those figures describe that comparison and nothing wider. Files outside `services/`, `pb/`,
 and `LICENSE` are not part of it and are not classified by these counts.
