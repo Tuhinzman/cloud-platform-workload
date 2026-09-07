@@ -44,4 +44,19 @@ export default [
       '@typescript-eslint/no-unused-vars': 'error',
     },
   },
+  {
+    // The TypeScript preset spreads a base config that carries no file restriction, so
+    // rules about TypeScript module syntax also reach plain JavaScript. package.json
+    // declares no "type", so Node resolves every .js here as CommonJS and require is the
+    // correct call form rather than a finding: next.config.js is read by Next through
+    // require, and utils/telemetry/Instrumentation.js is loaded through --require, which
+    // accepts CommonJS only. Rewriting either as a module would break how it is loaded.
+    //
+    // Only this rule's reach is corrected. It stays in force for TypeScript, and these
+    // files stay subject to every other rule.
+    files: ['**/*.js'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 ]
