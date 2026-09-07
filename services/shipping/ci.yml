@@ -64,6 +64,8 @@ shipping:health-test:
 
 shipping:publish:
   extends: .ecr-publish-template
+  dependencies:
+    - shipping:build
   variables:
     <<: *shipping-vars
     ECR_REPOSITORY: astroshop/shipping

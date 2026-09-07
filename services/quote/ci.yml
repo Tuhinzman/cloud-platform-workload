@@ -60,6 +60,8 @@ quote:health-test:
 
 quote:publish:
   extends: .ecr-publish-template
+  dependencies:
+    - quote:build
   variables:
     <<: *quote-vars
     ECR_REPOSITORY: astroshop/quote

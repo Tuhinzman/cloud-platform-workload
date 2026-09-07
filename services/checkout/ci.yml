@@ -60,6 +60,8 @@ checkout:health-test:
 
 checkout:publish:
   extends: .ecr-publish-template
+  dependencies:
+    - checkout:build
   variables:
     <<: *checkout-vars
     ECR_REPOSITORY: astroshop/checkout
