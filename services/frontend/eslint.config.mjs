@@ -46,15 +46,19 @@ export default [
   },
   {
     // The TypeScript preset spreads a base config that carries no file restriction, so
-    // rules about TypeScript module syntax also reach plain JavaScript. package.json
-    // declares no "type", so Node resolves every .js here as CommonJS and require is the
-    // correct call form rather than a finding: next.config.js is read by Next through
-    // require, and utils/telemetry/Instrumentation.js is loaded through --require, which
-    // accepts CommonJS only. Rewriting either as a module would break how it is loaded.
+    // rules about TypeScript module syntax also reach plain JavaScript. These two files
+    // have to be CommonJS: next.config.js is read by Next through require, and
+    // utils/telemetry/Instrumentation.js is loaded through --require, which accepts
+    // CommonJS only. Rewriting either as a module would break how it is loaded.
     //
-    // Only this rule's reach is corrected. It stays in force for TypeScript, and these
-    // files stay subject to every other rule.
-    files: ['**/*.js'],
+    // Named individually rather than by a .js glob. Being a .js file is not on its own a
+    // reason to be exempt, and utils/imageLoader.js is the counter-example: it is .js but
+    // written as a module and bundled. A glob would also exempt future JavaScript files
+    // that nobody has looked at.
+    //
+    // Only this rule's reach is corrected. It stays in force everywhere else, and these
+    // two files stay subject to every other rule.
+    files: ['next.config.js', 'utils/telemetry/Instrumentation.js'],
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
     },
