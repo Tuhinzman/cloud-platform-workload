@@ -63,4 +63,18 @@ export default [
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  {
+    // setupNodeEvents is declared by Cypress as (on, config). The callback here is still
+    // a stub, so neither parameter is read yet, and the default after-used check reports
+    // both because nothing after them is used. The names are kept because they are the
+    // documented shape of the hook and are what a listener registered here would use.
+    //
+    // The exemption is anchored to those two names rather than turning argument checking
+    // off for the file, so any other unused parameter, and every unused variable, is
+    // still an error here.
+    files: ['cypress.config.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^(on|config)$' }],
+    },
+  },
 ]
