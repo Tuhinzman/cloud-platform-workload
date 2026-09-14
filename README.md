@@ -1,7 +1,8 @@
 # Cloud Platform Workload
 
 The application this platform runs, and nothing else. Architecture, infrastructure, and
-the reasoning behind them live in the platform reference repository. This repository holds
+the reasoning behind them live in the
+[platform reference repository](https://github.com/Tuhinzman/cloud-platform-reference). This repository holds
 workload source, container definitions, build configuration, and the provenance record
 that makes the derivation reproducible.
 

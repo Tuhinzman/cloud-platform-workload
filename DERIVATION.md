@@ -235,8 +235,9 @@ and no service is claimed to have coverage it does not have.
 | checkout | `money/money_test.go` | Unit, Go, one package only |
 | flagd-ui | `test/flagd_ui/storage_test.exs`, four controller tests under `test/flagd_ui_web/controllers/`, `test/test_helper.exs`, `config/test.exs` | Unit and controller, Elixir |
 | frontend | `cypress.config.ts` with `Dockerfile.cypress` | Browser test harness configuration |
+| shipping | `#[cfg(test)]` module in `src/shipping_service.rs` | Unit, Rust |
 
-Thirteen of the seventeen components carry no tests at the pinned tag. The pipeline runs
+Twelve of the seventeen components carry no tests at the pinned tag. The pipeline runs
 whatever tests a service actually has and does not fabricate a test stage for the rest.
 
 ## Build Scripts and Manifests
