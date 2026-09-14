@@ -17,7 +17,7 @@ Components that simply do not run are not exceptions. They are recorded as exclu
 | Why it is not built here | The directory contains no container definition. Verified at tag `2.2.0`, where the component has zero Dockerfiles. There is nothing to build from. |
 | Role | Feature-flag evaluation, which the feature-control validation path depends on. |
 | What is lost | No build provenance and no SBOM produced by this project. The image is upstream work end to end. |
-| Handling | Pinned by digest and mirrored into the platform registry, so no pod start depends on an external service. Scanned in that registry under the same threshold that gates built services. |
+| Handling | Not yet mirrored or scanned. The intended handling is a digest pin mirrored into the platform registry, so no pod start depends on an external service, scanned there under the same threshold that gates built services. flagd is disabled in the only environment that has run, and the platform registry holds no flagd repository today. |
 | Condition to remove | Upstream adds a container definition, or the feature-control path is served by a component this project builds. |
 
 ## Components Deployed but Not Yet Classified Here

@@ -36,9 +36,11 @@ is recorded.
 
 ## Current Status
 
-Implementation evidence is partial. Checkout has been built, scanned, published with an
-SBOM, and validated during a bounded EKS runtime window. That runtime was subsequently
-torn down, and no runtime is currently live.
+Implementation evidence is partial. Checkout, shipping and quote have each been built,
+scanned, published with an SBOM, and exercised inside bounded EKS runtime windows:
+shipping carries a four-of-four telemetry signal digest match, and quote's induced fault
+and recovery were observed end to end. Every runtime was torn down, and no runtime is
+currently live.
 
 Twenty-two container definitions are modified, each carrying an Apache-2.0 modification
 notice. They are adapted deliberately, for this repository's build layout and for the
@@ -46,7 +48,8 @@ platform work this workload exists to exercise.
 
 Beyond those, `checkout` carries project modifications to its application source and its Go
 dependency metadata, `product-catalog` and `shipping` to their application source, and
-`quote` to its dependency metadata. Every other upstream-derived file in the compared scope,
+`quote` to its dependency metadata, and `frontend` to five application-source files. Every
+other upstream-derived file in the compared scope,
 including all remaining application source and the protobuf contract, is byte-identical to
 the pinned upstream release. That scope is `services/`, `pb/` and `LICENSE`, and the
 comparison makes no claim about files outside it.
@@ -63,11 +66,14 @@ lint stage only. The product-catalog Go lint job is now configured as blocking a
 latest validated run reports no findings. payment declares no linter and no TypeScript, so
 it extends a Node parse check rather than a lint, which asserts only that every `.js` file
 in the service directory parses; that job is now configured as blocking and its first
-validated run passed. The frontend Node lint job remains non-blocking and exits before any
-lint finding is produced, because the service carries no ESLint flat configuration.
+validated run passed. The frontend Node lint job is blocking: the service now carries a
+project-added flat ESLint configuration, and the latest validated run on main reports zero
+errors and twelve reported-but-unremediated warnings, with the TypeScript check reached and
+passing.
 
-Checkout has also completed build, scan, SBOM, and artifact-publication stages. Those
-stages are not yet evidenced fleet-wide, and promotion remains a separate implementation
+Checkout, shipping and quote have each completed build, scan, SBOM and artifact-publication
+stages, and each published digest was read back independently from the registry. Those
+stages are not evidenced fleet-wide, and promotion remains a separate implementation
 and validation obligation.
 
 ## Licence and Attribution

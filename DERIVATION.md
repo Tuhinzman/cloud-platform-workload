@@ -308,19 +308,24 @@ application language.
 
 ### Deferred work
 
-Net-new implementation with nothing to carry forward:
+Net-new implementation still outstanding:
 
 - Language-tier templates for .NET, Java, Python, Ruby, C++, and Elixir.
-- The build stage. The runner executor model is undecided, and the prior project's approach
-  depended on infrastructure assumptions that do not transfer.
+- Image size budgets.
+
+Net-new and now implemented, executed for checkout, shipping and quote:
+
+- The build stage, on hosted runners.
 - Publication to the platform registry, federated pipeline credentials, and SBOM
   generation. None existed in the prior project.
-- Promotion by immutable digest, which needs a deployment repository that does not exist.
-- Container health validation and image size budgets, which need built images.
+- Container health validation.
+- Automatic promotion by immutable digest. The deployment repository exists and already pins checkout, shipping and quote by digest, but every pin is a manual owner-reviewed change and nothing in this pipeline writes to it.
 - Scanner ignore baselines, created when there is a real exception to record.
 
-Build, publish, and promote are declared as stages and left unpopulated so the order stays
-visible. No placeholder job was created.
+Promote is declared as a stage and left unpopulated so the order stays visible, because
+promotion is a change to the GitOps repository rather than a pipeline job. Build and
+publish are populated for checkout, shipping and quote and unpopulated for the rest. No
+placeholder job was created.
 
 ## Licensing and Attribution
 
