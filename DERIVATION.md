@@ -43,7 +43,7 @@ Seventeen component directories and the protobuf contract. Each component moved 
 
 | Excluded | Upstream path | Reason |
 |---|---|---|
-| flagd | `src/flagd` | No container definition at the pinned tag, verified. Deployed as a justified upstream exception rather than built here. |
+| flagd | `src/flagd` | No container definition at the pinned tag, verified. Classified as the justified upstream exception rather than built here; not yet mirrored, scanned or enabled in any environment. |
 | kafka | `src/kafka` | Infrastructure dependency. Deployment form is an open implementation decision. |
 | postgresql | `src/postgresql` | Infrastructure dependency. Data that outlives its environment belongs in a managed service. |
 | load-generator | `src/load-generator` | Not deployed. Runs as root and carries a large volume of unfixed operating-system findings. May be enabled inside a bounded, owner-approved validation window. |

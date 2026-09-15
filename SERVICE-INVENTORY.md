@@ -76,9 +76,13 @@ code, which is the same shape as `frontend-proxy`.
 
 ## 3. Justified Upstream Exceptions
 
-Deployed but not built here. Pinned by digest, mirrored into the platform registry so no pod
-start depends on an external service, and scanned there under the same threshold that gates
-built services. They carry no build provenance, and that limit is stated rather than implied.
+Deployed but not built here. Under ADR-0012 these are pinned by digest, mirrored into the
+platform registry so no pod start depends on an external service, and scanned there under the
+same threshold that gates built services. They carry no build provenance, and that limit is
+stated rather than implied. That is the required handling rather than a record of what has
+happened: none of those controls has been executed for the entry below, which is not mirrored,
+not scanned, carries no project-owned digest, and is disabled in the only environment that has
+run.
 
 | Component | Why not built here | Condition to remove |
 |---|---|---|
