@@ -24,9 +24,13 @@
   script:
     - docker build -f "${SERVICE_PATH}/Dockerfile" -t "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" .
     - docker save -o image.tar "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
+    # GitLab tells a job only its own id, so the build records its own for the evidence
+    # bundle to pick up; the scan job forwards it rather than pulling image.tar again.
+    - printf '%s\n' "${CI_JOB_ID}" > build-job-id.txt
   artifacts:
     paths:
       - image.tar
+      - build-job-id.txt
     expire_in: 1 day
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]

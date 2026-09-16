@@ -13,6 +13,14 @@
 #
 # Manual on purpose. Enabling CI/CD must not publish anything by itself, and the first
 # digest is a separately authorized step.
+#
+# The raw registry manifest is retained because the published digest is the SHA-256 of
+# exactly those bytes. Keeping them is what lets a later reader recompute the digest
+# instead of trusting a number this job printed, and it is the hop that was missing when
+# an earlier artifact's binding had to be recorded as derived rather than direct. Only the
+# retrieval happens here; the evidence stage does the verifying, so a fetch problem and an
+# integrity problem stay distinguishable. batch-get-image needs ecr:BatchGetImage, which
+# this role already holds for publication read-back, so no permission changes.
 
 .ecr-publish-template:
   extends: .docker-dind
@@ -45,10 +53,27 @@
     # because the full reference carries the account.
     - docker inspect --format='{{index .RepoDigests 0}}' "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}" | cut -d@ -f2 > digest.txt
     - cat digest.txt
+    # Command substitution drops the trailing newline the CLI adds; the manifest bytes must
+    # be byte-exact or their hash is not the published digest.
+    - |
+      aws ecr batch-get-image \
+        --repository-name "${ECR_REPOSITORY}" \
+        --image-ids imageDigest="$(cat digest.txt)" \
+        --accept-media-types "application/vnd.docker.distribution.manifest.v2+json" "application/vnd.oci.image.manifest.v1+json" \
+        --query 'images[0].imageManifest' \
+        --output text > registry-manifest.out
+      printf '%s' "$(cat registry-manifest.out)" > registry-manifest.json
+      rm -f registry-manifest.out
+      test -s registry-manifest.json
+    - date -u +%Y-%m-%dT%H:%M:%SZ > published-at.txt
+    - printf '%s\n' "${CI_JOB_ID}" > publish-job-id.txt
   artifacts:
     paths:
       - digest.txt
-    expire_in: 30 days
+      - registry-manifest.json
+      - published-at.txt
+      - publish-job-id.txt
+    expire_in: never
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual

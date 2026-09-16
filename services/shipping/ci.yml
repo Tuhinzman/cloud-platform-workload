@@ -69,3 +69,11 @@ shipping:publish:
   variables:
     <<: *shipping-vars
     ECR_REPOSITORY: astroshop/shipping
+
+shipping:retain-evidence:
+  extends: .evidence-retain-template
+  dependencies:
+    - shipping:scan-image
+    - shipping:publish
+  variables:
+    <<: *shipping-vars

@@ -1,0 +1,78 @@
+# Durable artifact provenance.
+#
+# The problem this solves is not confidentiality, it is durability. Job artifacts expire,
+# and when they do the raw scan and SBOM behind a published digest are gone: checkout's
+# are already unrecoverable, and shipping's and quote's had to be rescued by hand. A fleet
+# publishes more artifacts, not fewer, so the mechanism has to be structural.
+#
+# Where the bundle lives is a measured decision rather than a preference. This project is
+# public, and on a public GitLab project the package registry is readable by anyone on the
+# internet, which disqualifies it for raw vulnerability reports. Job artifacts are not:
+# project-based pipeline visibility is off here, so they are readable only by project
+# members. So the evidence stays where it already is and stops expiring, rather than moving
+# somewhere more durable but less private.
+#
+# expire_in: never is the retention rule because the alternative cannot be expressed. The
+# invariant is that evidence for a digest still referenced by GitOps, or retained as
+# historical validation, must not be deleted; no time-based rule knows either fact. Removal
+# is therefore an explicit owner action, not a schedule. The bundles are kilobytes.
+#
+# Evidence identity is component + source commit + published digest, and the generator
+# refuses to overwrite one identity with different bytes, so a retried job either
+# reproduces the bundle exactly or fails.
+#
+# The job runs after a successful publish and is not optional. That is the promotion
+# contract: a published digest becomes eligible for GitOps promotion only once this job has
+# succeeded. If publication succeeds and this fails, the image exists in the registry but
+# the pipeline is red and the digest is PUBLISHED-BUT-NOT-PROMOTION-ELIGIBLE. Nothing is
+# deleted from the registry, because no cleanup policy here authorizes that.
+
+.evidence-retain-template:
+  stage: evidence
+  image: python:3.13-alpine
+  variables:
+    COMPONENT_CLASS: project-built-application-service
+  script:
+    - |
+      python3 ci/tools/evidence_manifest.py \
+        --component "${SERVICE_NAME}" \
+        --component-class "${COMPONENT_CLASS}" \
+        --source-commit "${CI_COMMIT_SHA}" \
+        --pipeline-id "${CI_PIPELINE_ID}" \
+        --build-job-id "$(cat build-job-id.txt 2>/dev/null || true)" \
+        --scan-job-id "$(cat scan-job-id.txt 2>/dev/null || true)" \
+        --publish-job-id "$(cat publish-job-id.txt 2>/dev/null || true)" \
+        --evidence-job-id "${CI_JOB_ID}" \
+        --trivy trivy-findings.json \
+        --sbom sbom.cdx.json \
+        --db-metadata trivy-db-metadata.json \
+        --registry-manifest registry-manifest.json \
+        --digest-file digest.txt \
+        --gate-rc-file trivy-gate-rc.txt \
+        --publication-timestamp "$(cat published-at.txt)" \
+        --out-dir evidence
+    # Covers the manifest as well as the raw files, so the whole bundle verifies with one
+    # command and the manifest is not the only thing vouching for itself.
+    - |
+      bundle="evidence/${SERVICE_NAME}/${CI_COMMIT_SHA}/$(cut -d: -f2 digest.txt)"
+      cd "${bundle}"
+      sha256sum trivy-findings.json sbom.cdx.json registry-manifest.json evidence-manifest.json > SHA256SUMS
+      sha256sum -c SHA256SUMS
+      cd "${CI_PROJECT_DIR}"
+  artifacts:
+    paths:
+      - evidence/
+    expire_in: never
+    when: on_success
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Runs on every pipeline, because a generator that is only exercised at publication time is
+# a generator nobody finds out is broken until the evidence matters.
+evidence-tools:test:
+  stage: lint
+  image: python:3.13-alpine
+  script:
+    - python3 -m unittest discover -s ci/tools/tests -v
+  rules:
+    - changes: ["ci/tools/**", "ci/templates/evidence-retain.yml", ".gitlab-ci.yml"]

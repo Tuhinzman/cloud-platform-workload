@@ -65,3 +65,11 @@ checkout:publish:
   variables:
     <<: *checkout-vars
     ECR_REPOSITORY: astroshop/checkout
+
+checkout:retain-evidence:
+  extends: .evidence-retain-template
+  dependencies:
+    - checkout:scan-image
+    - checkout:publish
+  variables:
+    <<: *checkout-vars

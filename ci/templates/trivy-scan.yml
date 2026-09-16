@@ -12,6 +12,17 @@
 # published image would mean publishing before the gate, which is the opposite of what
 # the gate exists for. The SBOM is written between the two passes, so it survives a
 # pipeline the gate blocks.
+#
+# Two things are captured that the reports themselves do not carry. The vulnerability
+# database metadata is read straight after the first pass, so it describes the database
+# that pass actually used, and reading it neither updates the database nor changes the
+# result. The blocking pass records its own exit status, because the gate result was
+# previously only derivable from the fact that the informational findings were empty, and
+# an observed status is evidence where a derivation is an argument.
+#
+# The evidence artifacts do not expire. What they support - the provenance of a published
+# digest - has no expiry either, and a 30 day window has already cost this project one
+# service's raw scan history.
 
 .trivy-scan-template:
   stage: scan
@@ -37,23 +48,36 @@
         --output trivy-findings.json \
         --exit-code 0 \
         --input image.tar
+    - trivy version --format json > trivy-db-metadata.json || true
     - |
       trivy image \
         --format cyclonedx \
         --output sbom.cdx.json \
         --input image.tar
+    - printf '%s\n' "${CI_JOB_ID}" > scan-job-id.txt
+    # The gate itself is unchanged. Only its exit status is recorded before the job carries
+    # that same status forward, so nothing about what blocks a pipeline moves here.
     - |
+      set +e
       trivy image \
         --severity HIGH,CRITICAL \
         --ignore-unfixed \
         --ignorefile .trivy-combined-ignore.txt \
         --exit-code 1 \
         --input image.tar
+      gate_rc=$?
+      set -e
+      printf '%s\n' "${gate_rc}" > trivy-gate-rc.txt
+      exit "${gate_rc}"
   artifacts:
     paths:
       - trivy-findings.json
       - sbom.cdx.json
-    expire_in: 30 days
+      - trivy-db-metadata.json
+      - trivy-gate-rc.txt
+      - scan-job-id.txt
+      - build-job-id.txt
+    expire_in: never
     when: always
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]

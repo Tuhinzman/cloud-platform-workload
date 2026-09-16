@@ -5,7 +5,9 @@
 # digest is built from. shipping and quote follow the same shape, because the workload pair
 # they form has to be built and published by this pipeline before it can be exercised. The
 # remaining services stay on lint until they are wired in turn.
-# Promotion is a change to the GitOps repository, so nothing fills that stage here.
+# Promotion is a change to the GitOps repository, so nothing fills that stage here, but it
+# stays downstream of evidence: a published digest is promotion-eligible only once its
+# durable provenance bundle exists.
 #
 # Secret detection is GitLab's own analyzer rather than the image scanner. It answers a
 # different question and is kept a separate control for that reason. Its stage is
@@ -17,6 +19,7 @@ stages:
   - scan
   - health-test
   - publish
+  - evidence
   - promote
 
 include:
@@ -28,6 +31,7 @@ include:
   - local: ci/templates/image.yml
   - local: ci/templates/trivy-scan.yml
   - local: ci/templates/ecr-publish.yml
+  - local: ci/templates/evidence-retain.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - local: services/checkout/ci.yml
   - local: services/product-catalog/ci.yml

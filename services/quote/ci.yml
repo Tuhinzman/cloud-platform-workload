@@ -65,3 +65,11 @@ quote:publish:
   variables:
     <<: *quote-vars
     ECR_REPOSITORY: astroshop/quote
+
+quote:retain-evidence:
+  extends: .evidence-retain-template
+  dependencies:
+    - quote:scan-image
+    - quote:publish
+  variables:
+    <<: *quote-vars
