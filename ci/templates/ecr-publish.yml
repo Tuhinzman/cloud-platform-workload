@@ -14,6 +14,11 @@
 # Manual on purpose. Enabling CI/CD must not publish anything by itself, and the first
 # digest is a separately authorized step.
 #
+# The rule carries the same changes gate the build and scan jobs use, so this job exists
+# only in pipelines that actually built the service. Without it a docs-only commit created
+# a blocking manual job with no image.tar behind it: unplayable, and it held the pipeline
+# at the publish stage for nothing.
+#
 # The raw registry manifest is retained because the published digest is the SHA-256 of
 # exactly those bytes. Keeping them is what lets a later reader recompute the digest
 # instead of trusting a number this job printed, and it is the hop that was missing when
@@ -93,4 +98,5 @@
     expire_in: never
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+      changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
       when: manual

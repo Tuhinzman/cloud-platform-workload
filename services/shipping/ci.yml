@@ -72,8 +72,9 @@ shipping:publish:
 
 shipping:retain-evidence:
   extends: .evidence-retain-template
-  dependencies:
-    - shipping:scan-image
-    - shipping:publish
+  needs:
+    - job: shipping:scan-image
+      optional: true
+    - job: shipping:publish
   variables:
     <<: *shipping-vars

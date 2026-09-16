@@ -68,8 +68,9 @@ checkout:publish:
 
 checkout:retain-evidence:
   extends: .evidence-retain-template
-  dependencies:
-    - checkout:scan-image
-    - checkout:publish
+  needs:
+    - job: checkout:scan-image
+      optional: true
+    - job: checkout:publish
   variables:
     <<: *checkout-vars

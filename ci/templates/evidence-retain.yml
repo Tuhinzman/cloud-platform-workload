@@ -24,8 +24,18 @@
 # The job runs after a successful publish and is not optional. That is the promotion
 # contract: a published digest becomes eligible for GitOps promotion only once this job has
 # succeeded. If publication succeeds and this fails, the image exists in the registry but
-# the pipeline is red and the digest is PUBLISHED-BUT-NOT-PROMOTION-ELIGIBLE. Nothing is
-# deleted from the registry, because no cleanup policy here authorizes that.
+# the pipeline does not pass and the digest is PUBLISHED-BUT-NOT-PROMOTION-ELIGIBLE. Nothing
+# is deleted from the registry, because no cleanup policy here authorizes that.
+#
+# Each service reaches this job through needs rather than stage order, because publication
+# is authorized one service at a time. Under stage ordering the evidence stage waits for
+# every job in the publish stage, so one service's unplayed manual publish held back another
+# service's evidence and the contract above could never be satisfied. With needs, a service
+# waits only on its own scan and publish.
+#
+# The publish job must stay blocking, which is what rules:when:manual already gives it. An
+# optional manual job would not merely fail to block: a job needing one that is never played
+# is skipped rather than held, so the evidence would quietly not exist.
 
 .evidence-retain-template:
   stage: evidence
@@ -66,6 +76,7 @@
     when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+      changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
 
 # Runs on every pipeline, because a generator that is only exercised at publication time is
 # a generator nobody finds out is broken until the evidence matters.

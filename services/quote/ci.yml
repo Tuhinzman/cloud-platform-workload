@@ -68,8 +68,9 @@ quote:publish:
 
 quote:retain-evidence:
   extends: .evidence-retain-template
-  dependencies:
-    - quote:scan-image
-    - quote:publish
+  needs:
+    - job: quote:scan-image
+      optional: true
+    - job: quote:publish
   variables:
     <<: *quote-vars
