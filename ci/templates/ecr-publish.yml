@@ -55,16 +55,33 @@
     - cat digest.txt
     # Command substitution drops the trailing newline the CLI adds; the manifest bytes must
     # be byte-exact or their hash is not the published digest.
+    #
+    # A digest that is not in the repository is not a CLI error: it comes back under
+    # failures, and the queries below then print the literal None. Asking the registry which
+    # digest it actually returned, and requiring it to equal the one just pushed, is what
+    # separates a real manifest from a miss. A non-empty check does not, because None is
+    # four bytes.
     - |
-      aws ecr batch-get-image \
-        --repository-name "${ECR_REPOSITORY}" \
-        --image-ids imageDigest="$(cat digest.txt)" \
-        --accept-media-types "application/vnd.docker.distribution.manifest.v2+json" "application/vnd.oci.image.manifest.v1+json" \
-        --query 'images[0].imageManifest' \
-        --output text > registry-manifest.out
-      printf '%s' "$(cat registry-manifest.out)" > registry-manifest.json
-      rm -f registry-manifest.out
-      test -s registry-manifest.json
+      published=$(cat digest.txt)
+      fetch() {
+        aws ecr batch-get-image \
+          --repository-name "${ECR_REPOSITORY}" \
+          --image-ids imageDigest="${published}" \
+          --accepted-media-types "application/vnd.docker.distribution.manifest.v2+json" "application/vnd.oci.image.manifest.v1+json" \
+          --query "$1" \
+          --output text
+      }
+      returned=$(fetch 'images[0].imageId.imageDigest')
+      manifest=$(fetch 'images[0].imageManifest')
+      if [ "${returned}" != "${published}" ]; then
+        echo "ECR returned digest '${returned}' for published digest '${published}'"
+        exit 1
+      fi
+      case "${manifest}" in
+        "{"*) ;;
+        *) echo "ECR returned no manifest document for ${published}"; exit 1 ;;
+      esac
+      printf '%s' "${manifest}" > registry-manifest.json
     - date -u +%Y-%m-%dT%H:%M:%SZ > published-at.txt
     - printf '%s\n' "${CI_JOB_ID}" > publish-job-id.txt
   artifacts:
