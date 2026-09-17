@@ -1,0 +1,94 @@
+# Declarative configuration for frontend-proxy. Behaviour lives in ci/templates.
+#
+# Only the repository name is written here: the account-bearing registry host arrives as a
+# masked project variable, because it identifies the AWS account.
+#
+# There is no lint or test tier, and LANG_TIER records that as a classification rather than
+# leaving it to look like an omission. This service contains no application source: the
+# directory holds a Dockerfile, a README and envoy.tmpl.yaml. A language tier here would
+# extend a template with nothing to parse, lint or test. The Dockerfile lint and the image
+# scan are the automated evidence this component produces, and both are language-agnostic.
+#
+# The health job sets every variable the template substitutes, which is more than the other
+# services need and is not defensive padding. envsubst blanks an unset variable, and Envoy
+# validates the whole bootstrap before it serves: started with only the three listener
+# variables set, the container exits with SocketAddressValidationError.Address "value length
+# must be at least 1 characters". So a missing cluster variable is a startup failure, not a
+# degraded proxy.
+#
+# The cluster hosts do not resolve in CI. That is deliberate and matches what the health
+# template already documents: the clusters are STRICT_DNS and resolve in the background, so
+# the listener comes up without the rest of the fleet existing. What this job proves is
+# bounded to that - the process starts, stays up and accepts a connection on ENVOY_PORT. It
+# does not prove any route reaches an upstream.
+
+.frontend-proxy-vars: &frontend-proxy-vars
+  SERVICE_NAME: frontend-proxy
+  SERVICE_PATH: services/frontend-proxy
+  LANG_TIER: none
+
+frontend-proxy:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *frontend-proxy-vars
+
+frontend-proxy:build:
+  extends: .image-build-template
+  variables:
+    <<: *frontend-proxy-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+frontend-proxy:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - frontend-proxy:build
+  variables:
+    <<: *frontend-proxy-vars
+
+frontend-proxy:health-test:
+  extends: .image-health-template
+  dependencies:
+    - frontend-proxy:build
+  variables:
+    <<: *frontend-proxy-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e ENVOY_ADDR=0.0.0.0
+      -e ENVOY_PORT=8080
+      -e ENVOY_ADMIN_PORT=9901
+      -e FRONTEND_HOST=frontend
+      -e FRONTEND_PORT=8080
+      -e IMAGE_PROVIDER_HOST=image-provider
+      -e IMAGE_PROVIDER_PORT=8081
+      -e FLAGD_HOST=flagd
+      -e FLAGD_PORT=8013
+      -e FLAGD_UI_HOST=flagd-ui
+      -e FLAGD_UI_PORT=4000
+      -e GRAFANA_HOST=grafana
+      -e GRAFANA_PORT=3000
+      -e JAEGER_HOST=jaeger
+      -e JAEGER_UI_PORT=16686
+      -e LOCUST_WEB_HOST=load-generator
+      -e LOCUST_WEB_PORT=8089
+      -e OTEL_COLLECTOR_HOST=otel-collector
+      -e OTEL_COLLECTOR_PORT_GRPC=4317
+      -e OTEL_COLLECTOR_PORT_HTTP=4318
+      -e OTEL_SERVICE_NAME=frontend-proxy
+
+frontend-proxy:publish:
+  extends: .ecr-publish-template
+  dependencies:
+    - frontend-proxy:build
+  variables:
+    <<: *frontend-proxy-vars
+    ECR_REPOSITORY: astroshop/frontend-proxy
+
+frontend-proxy:retain-evidence:
+  extends: .evidence-retain-template
+  needs:
+    - job: frontend-proxy:scan-image
+      optional: true
+    - job: frontend-proxy:publish
+  variables:
+    <<: *frontend-proxy-vars

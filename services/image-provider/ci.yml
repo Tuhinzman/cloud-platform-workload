@@ -1,0 +1,72 @@
+# Declarative configuration for image-provider. Behaviour lives in ci/templates.
+#
+# Only the repository name is written here: the account-bearing registry host arrives as a
+# masked project variable, because it identifies the AWS account.
+#
+# There is no lint or test tier, and LANG_TIER records that as a classification rather than
+# leaving it to look like an omission. This service contains no application source: the
+# directory holds a Dockerfile, nginx.conf.template and the static files it serves. A
+# language tier here would extend a template with nothing to parse, lint or test. The
+# Dockerfile lint and the image scan are the automated evidence this component produces,
+# and both are language-agnostic.
+#
+# The health job sets exactly the four variables the Dockerfile names in its envsubst call.
+# That list is the whole substitution set, so nothing else in nginx.conf.template can be
+# blanked. The resolver is a literal 127.0.0.11 in the template rather than a variable, so
+# it needs no value here, and the OTEL exporter endpoint is resolved when a span is
+# exported rather than when the config is parsed, so an absent collector does not stop
+# nginx from starting.
+
+.image-provider-vars: &image-provider-vars
+  SERVICE_NAME: image-provider
+  SERVICE_PATH: services/image-provider
+  LANG_TIER: none
+
+image-provider:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *image-provider-vars
+
+image-provider:build:
+  extends: .image-build-template
+  variables:
+    <<: *image-provider-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+image-provider:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - image-provider:build
+  variables:
+    <<: *image-provider-vars
+
+image-provider:health-test:
+  extends: .image-health-template
+  dependencies:
+    - image-provider:build
+  variables:
+    <<: *image-provider-vars
+    HEALTH_PORT: "8081"
+    HEALTH_ENV: >-
+      -e IMAGE_PROVIDER_PORT=8081
+      -e OTEL_COLLECTOR_HOST=otel-collector
+      -e OTEL_COLLECTOR_PORT_GRPC=4317
+      -e OTEL_SERVICE_NAME=image-provider
+
+image-provider:publish:
+  extends: .ecr-publish-template
+  dependencies:
+    - image-provider:build
+  variables:
+    <<: *image-provider-vars
+    ECR_REPOSITORY: astroshop/image-provider
+
+image-provider:retain-evidence:
+  extends: .evidence-retain-template
+  needs:
+    - job: image-provider:scan-image
+      optional: true
+    - job: image-provider:publish
+  variables:
+    <<: *image-provider-vars

@@ -3,8 +3,11 @@
 #
 # checkout populates every stage through publish, because it is the service the first
 # digest is built from. shipping and quote follow the same shape, because the workload pair
-# they form has to be built and published by this pipeline before it can be exercised. The
-# remaining services stay on lint until they are wired in turn.
+# they form has to be built and published by this pipeline before it can be exercised.
+# frontend-proxy and image-provider follow it too, now that each has a registry repository
+# to publish into. Neither carries a lint or test tier: both are configuration-only
+# components with no application source, which their own files record. The remaining
+# services stay on lint until they are wired in turn.
 # Promotion is a change to the GitOps repository, so nothing fills that stage here, but it
 # stays downstream of evidence: a published digest is promotion-eligible only once its
 # durable provenance bundle exists.
@@ -39,6 +42,8 @@ include:
   - local: services/payment/ci.yml
   - local: services/shipping/ci.yml
   - local: services/quote/ci.yml
+  - local: services/frontend-proxy/ci.yml
+  - local: services/image-provider/ci.yml
 
 secret_detection:
   stage: lint
