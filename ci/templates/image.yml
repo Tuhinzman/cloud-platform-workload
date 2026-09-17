@@ -7,6 +7,16 @@
 # The build stays local. Nothing reaches the registry before the scan gate has run, so
 # the image travels to the later stages as a saved tar artifact rather than a registry
 # tag, and a blocked pipeline publishes nothing.
+#
+# SERVICE_DOCKERFILE defaults to the conventional path and exists for the services that do
+# not follow it. cart keeps its container definition at services/cart/src/Dockerfile, where
+# upstream put it, and naming the file is cheaper than moving it and losing that lineage.
+#
+# BUILD_ARGS is expanded unquoted so a service can pass its own --build-arg pairs, the same
+# shape HEALTH_ENV already uses below. It is empty for every service today: the Java agent
+# version each Java service needs is a default inside its own Dockerfile, so a plain build
+# reproduces what CI builds. This exists so a version can be overridden without editing a
+# container definition.
 
 .docker-dind:
   image: docker:28-cli
@@ -22,7 +32,7 @@
   extends: .docker-dind
   stage: build
   script:
-    - docker build -f "${SERVICE_PATH}/Dockerfile" -t "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" .
+    - docker build ${BUILD_ARGS} -f "${SERVICE_DOCKERFILE:-${SERVICE_PATH}/Dockerfile}" -t "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" .
     - docker save -o image.tar "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
     # GitLab tells a job only its own id, so the build records its own for the evidence
     # bundle to pick up; the scan job forwards it rather than pulling image.tar again.
