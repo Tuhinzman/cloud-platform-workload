@@ -63,8 +63,11 @@ The pipeline now has shared templates for Go, Node, PHP, and Rust, but validatio
 coverage is not uniform across the fleet. Checkout has an executed and passing Dockerfile
 lint path. Shipping and quote have executed validated build, scan, SBOM, and container
 health paths. Frontend, payment, and product-catalog have executed pipelines that reach the
-lint stage only. The product-catalog Go lint job is now configured as blocking and its
-latest validated run reports no findings. payment declares no linter and no TypeScript, so
+lint stage only. frontend-proxy and image-provider are wired through the same shared
+templates for build, scan, SBOM and container health; neither carries a language tier,
+because neither directory holds application source. The product-catalog Go lint job is now
+configured as blocking and its latest validated run reports no findings. payment declares
+no linter and no TypeScript, so
 it extends a Node parse check rather than a lint, which asserts only that every `.js` file
 in the service directory parses; that job is now configured as blocking and its first
 validated run passed. The frontend Node lint job is blocking: the service now carries a
@@ -73,9 +76,12 @@ errors and twelve reported-but-unremediated warnings, with the TypeScript check 
 passing.
 
 Checkout, shipping and quote have each completed build, scan, SBOM and artifact-publication
-stages, and each published digest was read back independently from the registry. Those
-stages are not evidenced fleet-wide, and promotion remains a separate implementation
-and validation obligation.
+stages, and each published digest was read back independently from the registry.
+image-provider has since completed the same stages, and its pipeline also produced a
+retained provenance bundle whose published digest is the sha256 of the registry manifest
+bytes the bundle keeps. frontend-proxy is wired for those stages and has published nothing.
+Those stages are not evidenced fleet-wide, nine components have no pipeline configuration at
+all, and promotion remains a separate implementation and validation obligation.
 
 ## Licence and Attribution
 

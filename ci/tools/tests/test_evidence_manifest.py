@@ -126,10 +126,18 @@ class EvidenceManifestTest(unittest.TestCase):
         self.assertEqual(0, em.main(b.argv(self.root / "out", scan_job_id="16355432446")))
         names = sorted(p.name for p in self.bundle_path(b.digest).iterdir())
         self.assertEqual(
-            ["evidence-manifest.json", "registry-manifest.json", "sbom.cdx.json", "trivy-findings.json"], names
+            [
+                "evidence-manifest.json",
+                "registry-manifest.json",
+                "sbom.cdx.json",
+                "trivy-db-metadata.json",
+                "trivy-findings.json",
+                "trivy-gate-rc.txt",
+            ],
+            names,
         )
         m = self.read_manifest(b.digest)
-        self.assertEqual(1, m["schema_version"])
+        self.assertEqual(2, m["schema_version"])
         self.assertEqual("DIRECT", m["published_digest_binding"])
         self.assertEqual(b.digest, m["published_image_digest"])
         self.assertEqual(CONFIG, m["image_config_digest"])
@@ -244,6 +252,79 @@ class EvidenceManifestTest(unittest.TestCase):
             (self.root / "out2" / "shipping" / COMMIT / second.digest.split(":")[1] / "evidence-manifest.json").read_bytes(),
         )
 
+
+    def test_gate_exit_status_is_retained_as_bytes_not_only_asserted(self):
+        """Schema 2: the gate claim is checkable from the bundle instead of taken on trust."""
+        b = Bundle(self.root / "in")
+        self.assertEqual(0, em.main(b.argv(self.root / "out")))
+        retained = (self.bundle_path(b.digest) / "trivy-gate-rc.txt").read_bytes()
+        self.assertEqual((b.root / "gate-rc.txt").read_bytes(), retained)
+        m = self.read_manifest(b.digest)
+        self.assertEqual("0", m["gate_rc"])
+        self.assertEqual(hashlib.sha256(retained).hexdigest(), m["gate_rc_sha256"])
+        self.assertEqual("OBSERVED-EXIT-STATUS-OF-THE-BLOCKING-SCAN-PASS", m["gate_result_basis"])
+
+    def test_database_metadata_is_retained_as_bytes_and_sourced(self):
+        b = Bundle(self.root / "in")
+        self.assertEqual(0, em.main(b.argv(self.root / "out")))
+        retained = (self.bundle_path(b.digest) / "trivy-db-metadata.json").read_bytes()
+        self.assertEqual((b.root / "db.json").read_bytes(), retained)
+        m = self.read_manifest(b.digest)
+        self.assertEqual("trivy-db-metadata.json", m["vulnerability_db_metadata_source"])
+        self.assertEqual(hashlib.sha256(retained).hexdigest(), m["vulnerability_db_metadata_sha256"])
+
+    def test_absent_database_metadata_retains_no_file_and_says_so(self):
+        b = Bundle(self.root / "in", db=False)
+        self.assertEqual(0, em.main(b.argv(self.root / "out")))
+        self.assertFalse((self.bundle_path(b.digest) / "trivy-db-metadata.json").exists())
+        m = self.read_manifest(b.digest)
+        self.assertEqual("UNAVAILABLE", m["vulnerability_db_metadata_source"])
+        self.assertIsNone(m["vulnerability_db_metadata"])
+        self.assertIsNone(m["vulnerability_db_metadata_sha256"])
+
+    def test_promotion_eligible_carries_an_explicit_basis(self):
+        b = Bundle(self.root / "in")
+        self.assertEqual(0, em.main(b.argv(self.root / "out")))
+        m = self.read_manifest(b.digest)
+        self.assertTrue(m["promotion_eligible"])
+        basis = m["promotion_eligible_basis"]
+        self.assertIn("gate exited 0", basis)
+        self.assertIn("trivy-gate-rc.txt", basis)
+        self.assertIn("sha256 of the retained registry manifest bytes", basis)
+
+    def test_a_failed_gate_still_produces_no_bundle_under_schema_2(self):
+        """Retaining the exit status must not turn a blocking failure into a recorded one."""
+        b = Bundle(self.root / "in", gate_rc="1")
+        self.assertEqual(1, em.main(b.argv(self.root / "out")))
+        self.assertFalse((self.root / "out").exists())
+
+    def test_schema_1_bundles_stay_readable_and_are_not_relabelled(self):
+        """A historical bundle is a record of what it measured; nothing here rewrites it."""
+        legacy = {
+            "_fixture": FIXTURE_MARK,
+            "schema_version": 1,
+            "component": "shipping",
+            "published_image_digest": "sha256:" + "b" * 64,
+            "published_digest_binding": "DIRECT",
+            "gate_result": "PASS",
+            "gate_result_basis": "OBSERVED-EXIT-STATUS-OF-THE-BLOCKING-SCAN-PASS",
+        }
+        path = self.root / "legacy-evidence-manifest.json"
+        path.write_text(json.dumps(legacy, indent=2, sort_keys=True) + "\n")
+        before = path.read_bytes()
+        loaded = json.loads(path.read_text())
+        self.assertEqual(1, loaded["schema_version"])
+        self.assertEqual("DIRECT", loaded["published_digest_binding"])
+        self.assertNotIn("promotion_eligible_basis", loaded)
+        self.assertEqual(before, path.read_bytes())
+        self.assertEqual(2, em.SCHEMA_VERSION)
+
+    def test_new_bundle_files_are_covered_by_the_identity_refusal(self):
+        """The overwrite guard must cover the schema 2 files, not just the original three."""
+        b = Bundle(self.root / "in")
+        self.assertEqual(0, em.main(b.argv(self.root / "out")))
+        (self.bundle_path(b.digest) / "trivy-gate-rc.txt").write_bytes(b"0\n\n")
+        self.assertEqual(1, em.main(b.argv(self.root / "out")))
 
 if __name__ == "__main__":
     unittest.main()

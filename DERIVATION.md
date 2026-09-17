@@ -314,7 +314,7 @@ Net-new implementation still outstanding:
 - Language-tier templates for .NET, Java, Python, Ruby, C++, and Elixir.
 - Image size budgets.
 
-Net-new and now implemented, executed for checkout, shipping and quote:
+Net-new and now implemented, executed for checkout, shipping and quote, and since then for image-provider:
 
 - The build stage, on hosted runners.
 - Publication to the platform registry, federated pipeline credentials, and SBOM
@@ -325,8 +325,9 @@ Net-new and now implemented, executed for checkout, shipping and quote:
 
 Promote is declared as a stage and left unpopulated so the order stays visible, because
 promotion is a change to the GitOps repository rather than a pipeline job. Build and
-publish are populated for checkout, shipping and quote and unpopulated for the rest. No
-placeholder job was created.
+publish are populated for checkout, shipping, quote and image-provider, configured but not
+yet published for frontend-proxy, and unpopulated for the rest. No placeholder job was
+created.
 
 ## Licensing and Attribution
 

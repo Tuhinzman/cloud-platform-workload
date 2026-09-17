@@ -21,6 +21,12 @@
 # refuses to overwrite one identity with different bytes, so a retried job either
 # reproduces the bundle exactly or fails.
 #
+# The bundle carries the blocking gate's exit status and the vulnerability database metadata as
+# files, not only as manifest fields. Both were always produced and kept as scan-job artifacts,
+# but a reader holding the bundle alone had to take those two claims on trust; retaining the
+# bytes is what makes the gate result and the database provenance checkable rather than
+# asserted. That is the schema 1 to 2 change, and schema 1 bundles stay valid as written.
+#
 # The job runs after a successful publish and is not optional. That is the promotion
 # contract: a published digest becomes eligible for GitOps promotion only once this job has
 # succeeded. If publication succeeds and this fails, the image exists in the registry but
@@ -63,10 +69,14 @@
         --out-dir evidence
     # Covers the manifest as well as the raw files, so the whole bundle verifies with one
     # command and the manifest is not the only thing vouching for itself.
+    #
+    # The file list is read from the bundle rather than written out here. A named list has to be
+    # edited in lockstep with the generator, and the one thing worse than an uncovered file is a
+    # checksum file that looks complete and is not.
     - |
       bundle="evidence/${SERVICE_NAME}/${CI_COMMIT_SHA}/$(cut -d: -f2 digest.txt)"
       cd "${bundle}"
-      sha256sum trivy-findings.json sbom.cdx.json registry-manifest.json evidence-manifest.json > SHA256SUMS
+      ls -1 | grep -v '^SHA256SUMS$' | sort | xargs sha256sum > SHA256SUMS
       sha256sum -c SHA256SUMS
       cd "${CI_PROJECT_DIR}"
   artifacts:

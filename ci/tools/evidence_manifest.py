@@ -13,7 +13,7 @@ import json
 import pathlib
 import sys
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 REQUIRED = (
     "schema_version",
@@ -28,8 +28,25 @@ REQUIRED = (
     "sbom_sha256",
     "gate_result",
     "gate_result_basis",
+    "gate_rc",
+    "vulnerability_db_metadata_source",
     "scanner_version",
     "publication_timestamp",
+    "promotion_eligible_basis",
+)
+
+# Schema 2 retains the raw basis for two claims schema 1 carried only as derived values: the
+# blocking gate's exit status and the vulnerability database the scan actually used. Both were
+# already produced and kept as job artifacts; they were simply not copied into the bundle, so a
+# reader holding only the bundle had to take those two fields on trust. Nothing else changed,
+# and schema 1 bundles are still valid records of what they measured.
+GATE_RC_FILE = "trivy-gate-rc.txt"
+DB_METADATA_FILE = "trivy-db-metadata.json"
+
+PROMOTION_BASIS = (
+    "the blocking gate exited 0 as retained in " + GATE_RC_FILE + ", the published digest is the "
+    "sha256 of the retained registry manifest bytes, and that manifest declares the image config "
+    "the scan and sbom recorded"
 )
 
 
@@ -86,6 +103,17 @@ def sbom_image_id(sbom):
     return None
 
 
+def db_metadata_raw(path):
+    """The database metadata bytes as written by the scan job, or None when it produced none."""
+    if not path:
+        return None
+    p = pathlib.Path(path)
+    if not p.is_file():
+        return None
+    raw = p.read_bytes()
+    return raw if raw.strip() else None
+
+
 def db_metadata(path):
     if not path:
         return None
@@ -113,7 +141,8 @@ def build(args):
     registry_manifest = load_json(manifest_raw, "registry manifest")
 
     published_digest = read(args.digest_file, "published digest").decode().strip()
-    gate_rc_text = read(args.gate_rc_file, "gate exit status").decode().strip()
+    gate_rc_raw = read(args.gate_rc_file, "gate exit status")
+    gate_rc_text = gate_rc_raw.decode().strip()
 
     meta = trivy.get("Metadata") or {}
     config_digest = meta.get("ImageID")
@@ -146,6 +175,7 @@ def build(args):
 
     counts = severity_counts(trivy)
     db = db_metadata(args.db_metadata)
+    db_raw = db_metadata_raw(args.db_metadata)
 
     limitations = []
     if db is None:
@@ -207,22 +237,31 @@ def build(args):
         "fixable_critical": counts["fixable_critical"],
         "gate_result": "PASS",
         "gate_result_basis": "OBSERVED-EXIT-STATUS-OF-THE-BLOCKING-SCAN-PASS",
+        "gate_rc": gate_rc_text,
+        "gate_rc_sha256": sha256(gate_rc_raw),
+        "vulnerability_db_metadata_source": DB_METADATA_FILE if db_raw else "UNAVAILABLE",
+        "vulnerability_db_metadata_sha256": sha256(db_raw) if db_raw else None,
         "sbom_format": sbom.get("bomFormat"),
         "sbom_spec_version": sbom.get("specVersion"),
         "sbom_serial_number": sbom.get("serialNumber"),
         "publication_timestamp": args.publication_timestamp,
         "promotion_eligible": True,
+        "promotion_eligible_basis": PROMOTION_BASIS,
         "limitations": limitations,
     }
 
     missing = [field for field in REQUIRED if not manifest.get(field)]
     if missing:
         raise EvidenceError(f"required manifest fields are empty: {', '.join(missing)}")
-    return manifest, {
+    raw = {
         "trivy-findings.json": trivy_raw,
         "sbom.cdx.json": sbom_raw,
         "registry-manifest.json": manifest_raw,
+        GATE_RC_FILE: gate_rc_raw,
     }
+    if db_raw:
+        raw[DB_METADATA_FILE] = db_raw
+    return manifest, raw
 
 
 def write_bundle(out_dir, component, source_commit, published_digest, manifest, raw):

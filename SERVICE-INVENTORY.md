@@ -4,10 +4,15 @@ Per-component evidence for the fleet. This is the single copy. The platform refe
 repository links here rather than holding a second table, because two copies of a status
 table drift apart.
 
-**Evidence status is partial.** Checkout, shipping and quote each have build, scan, SBOM,
-artifact-publication and bounded runtime evidence. Evidence for the other fourteen
-components remains unpopulated until the corresponding implementation and validation have
-actually occurred. Identity and
+**Evidence status is partial, and the kinds of evidence differ.** Checkout, shipping and
+quote each have build, scan, SBOM, artifact-publication and bounded runtime evidence.
+image-provider has build, scan, SBOM and artifact-publication evidence, and a retained
+provenance bundle produced by the pipeline itself; it has no runtime evidence, because no
+runtime window has included it. frontend-proxy is wired for build, scan, SBOM and container
+health and has published nothing. Evidence for the remaining twelve components is
+unpopulated until the corresponding implementation and validation have actually occurred.
+Wiring is not execution, publication is not runtime evidence, and none of this is fleet-wide
+delivery: nine components have no pipeline configuration at all. Identity and
 classification are facts about the source and are populated independently of that evidence.
 
 Five classes. Every component belongs to exactly one, and the class decides what evidence
@@ -117,7 +122,9 @@ exception. It simply does not run.
 ## Evidence Owed by Every Deployed Component
 
 Sixteen items. No component carries the full set: checkout, shipping and quote carry most
-of them and the other fourteen components carry none. Upstream or external image origin, classification,
+of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline items
+but none of the runtime ones, frontend-proxy carries its pipeline configuration alone, and
+the remaining twelve components carry none. Upstream or external image origin, classification,
 modification record, container definition or image source, reusable pipeline configuration
 where project-built, build result where project-built, current scan result, SBOM where
 project-built, registry digest, desired-state digest that deploys it, runtime health,
