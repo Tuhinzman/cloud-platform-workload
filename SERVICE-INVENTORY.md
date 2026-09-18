@@ -61,9 +61,10 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 
 Four tiers of ten have a template today. Six services are wired to the pipeline, and nine
 are not because their tier has no template. Eight components are wired in total, the two
-configured components in section 2 included. Under ADR-0016 the remaining six tiers are
-not outstanding work: a further component is admitted only when it validates a platform
-property the current scope has not already demonstrated.
+configured components in section 2 included. ADR-0017 selects the full justified
+project-built inventory as the target of an owner-selected end-to-end programme, so the
+remaining six tiers are selected work rather than work ruled out. None of that work has
+begun, and nothing here says those components are delivered.
 
 ## 2. Project-Built Configured Components
 

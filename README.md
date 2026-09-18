@@ -82,8 +82,10 @@ pipeline retain the provenance itself, shipping first and then image-provider: e
 keeps the registry manifest bytes whose sha256 is the published digest. frontend-proxy is
 wired for those stages and has published nothing.
 Those stages are not evidenced fleet-wide and nine components have no pipeline configuration
-at all, which ADR-0016 bounds rather than carries as outstanding work; promotion remains a
-separate implementation and validation obligation.
+at all. ADR-0017 now selects the full justified project-built inventory as the target of an
+owner-selected end-to-end programme, so those nine are selected work that has not been
+started rather than work ruled out; selecting them is not delivering them, and promotion
+remains a separate implementation and validation obligation.
 
 ## Licence and Attribution
 

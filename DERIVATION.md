@@ -218,8 +218,9 @@ base images.
 | C++ | currency | `CMakeLists.txt` | Net-new |
 | Elixir | flagd-ui | `mix.exs` | Net-new |
 
-Four tiers of ten have a template today. The other six have none, which ADR-0016 bounds
-rather than schedules.
+Four tiers of ten have a template today. The other six have none. ADR-0017 selects the
+full justified project-built inventory as the programme target, so those six tiers are
+selected work that has not been started; no schedule for them is claimed here.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
 upstream binary with project-owned configuration, so no language-tier template applies to
@@ -311,9 +312,9 @@ build, lint and scan.
 
 ### Not implemented
 
-ADR-0016 bounds the implemented scope by demonstrated platform-validation value rather
-than by fleet completeness, so the following are recorded as not implemented rather than
-as outstanding work:
+ADR-0017 selects the full justified project-built inventory as the target of an
+owner-selected end-to-end programme. Selection is not delivery, and no work has begun on
+that breadth, so the following are recorded as not implemented:
 
 - Language-tier templates for .NET, Java, Python, Ruby, C++, and Elixir.
 - Image size budgets.
