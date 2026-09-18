@@ -6,10 +6,10 @@ table drift apart.
 
 **Evidence status is partial, and the kinds of evidence differ.** Checkout, shipping and
 quote each have build, scan, SBOM, artifact-publication and bounded runtime evidence.
-image-provider has build, scan, SBOM and artifact-publication evidence, and a retained
-provenance bundle produced by the pipeline itself; it has no runtime evidence, because no
-runtime window has included it. frontend-proxy is wired for build, scan, SBOM and container
-health and has published nothing. Evidence for the remaining twelve components is
+image-provider has build, scan, SBOM and artifact-publication evidence; it has no runtime
+evidence, because no runtime window has included it. Two publications carry a provenance
+bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
+is wired for build, scan, SBOM and container health and has published nothing. Evidence for the remaining twelve components is
 unpopulated until the corresponding implementation and validation have actually occurred.
 Wiring is not execution, publication is not runtime evidence, and none of this is fleet-wide
 delivery: nine components have no pipeline configuration at all. Identity and
@@ -59,9 +59,11 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | C++ | currency | Net-new |
 | Elixir | flagd-ui | Net-new |
 
-Four tiers of ten have a template today. Six tiers still require net-new templates. Six
-services are wired to the pipeline, and nine are not because their tier does not yet have
-a template.
+Four tiers of ten have a template today. Six services are wired to the pipeline, and nine
+are not because their tier has no template. Eight components are wired in total, the two
+configured components in section 2 included. Under ADR-0016 the remaining six tiers are
+not outstanding work: a further component is admitted only when it validates a platform
+property the current scope has not already demonstrated.
 
 ## 2. Project-Built Configured Components
 

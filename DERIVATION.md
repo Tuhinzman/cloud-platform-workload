@@ -218,7 +218,8 @@ base images.
 | C++ | currency | `CMakeLists.txt` | Net-new |
 | Elixir | flagd-ui | `mix.exs` | Net-new |
 
-Four tiers of ten have a template today. Six are net-new work.
+Four tiers of ten have a template today. The other six have none, which ADR-0016 bounds
+rather than schedules.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
 upstream binary with project-owned configuration, so no language-tier template applies to
@@ -303,13 +304,16 @@ account-bearing host and the role arrive as masked CI variables instead. Where a
 has no repository in the platform registry, as `product-catalog`, `frontend`, and
 `payment` do not, its image jobs stay unwired rather than pointing somewhere wrong.
 
-Eleven components have no per-service configuration yet: nine because their language tier
-has no template, and `frontend-proxy` and `image-provider` because they have no
-application language.
+Nine components have no per-service configuration, because their language tier has no
+template. `frontend-proxy` and `image-provider` have no application language, and each
+carries a per-service `ci.yml` regardless, because a container definition is enough to
+build, lint and scan.
 
-### Deferred work
+### Not implemented
 
-Net-new implementation still outstanding:
+ADR-0016 bounds the implemented scope by demonstrated platform-validation value rather
+than by fleet completeness, so the following are recorded as not implemented rather than
+as outstanding work:
 
 - Language-tier templates for .NET, Java, Python, Ruby, C++, and Elixir.
 - Image size budgets.
@@ -372,11 +376,11 @@ upstream-derived files differ in content: the twenty-two container definitions r
 modified above, plus the eleven the preceding section records. Those eleven are what
 separates this result from the twenty-two figure, which counts modified container
 definitions only. The remaining three hundred and nineteen upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Seven files
+scope are byte-identical, and no upstream file in the scope is missing here. Nine files
 are present here and absent upstream: the per-service `ci.yml` under `checkout`,
-`product-catalog`, `frontend`, `payment`, `shipping`, and `quote`, and
-`services/frontend/eslint.config.mjs`. Those seven are project-added configuration with
-no upstream origin, so no modification notice applies to them. The flat ESLint
+`product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`, and
+`image-provider`, and `services/frontend/eslint.config.mjs`. Those nine are project-added
+configuration with no upstream origin, so no modification notice applies to them. The flat ESLint
 configuration is project-added rather than a modification because ESLint 9 reads flat
 configuration only and upstream ships none; the upstream `.eslintrc` beside it is
 retained unmodified and still counts among the byte-identical files.

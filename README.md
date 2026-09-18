@@ -77,11 +77,13 @@ passing.
 
 Checkout, shipping and quote have each completed build, scan, SBOM and artifact-publication
 stages, and each published digest was read back independently from the registry.
-image-provider has since completed the same stages, and its pipeline also produced a
-retained provenance bundle whose published digest is the sha256 of the registry manifest
-bytes the bundle keeps. frontend-proxy is wired for those stages and has published nothing.
-Those stages are not evidenced fleet-wide, nine components have no pipeline configuration at
-all, and promotion remains a separate implementation and validation obligation.
+image-provider has since completed the same stages. Two of those publications also had the
+pipeline retain the provenance itself, shipping first and then image-provider: each bundle
+keeps the registry manifest bytes whose sha256 is the published digest. frontend-proxy is
+wired for those stages and has published nothing.
+Those stages are not evidenced fleet-wide and nine components have no pipeline configuration
+at all, which ADR-0016 bounds rather than carries as outstanding work; promotion remains a
+separate implementation and validation obligation.
 
 ## Licence and Attribution
 
