@@ -95,6 +95,9 @@
 evidence-tools:test:
   stage: lint
   image: python:3.13-alpine
+  # The graph evaluator reads GitLab YAML and the base image ships no parser.
+  before_script:
+    - pip install --no-cache-dir --quiet pyyaml==6.0.3
   script:
     - python3 -m unittest discover -s ci/tools/tests -v
   rules:
