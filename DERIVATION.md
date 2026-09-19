@@ -209,7 +209,7 @@ base images.
 |---|---|---|---|
 | Go | checkout, product-catalog | `go.mod` | `ci/templates/lang-go.yml`, carried |
 | Node | frontend, payment | `package.json` | `ci/templates/lang-node.yml` |
-| .NET | accounting, cart | `Accounting.csproj`, `cart.sln` | Net-new |
+| .NET | accounting, cart | `Accounting.csproj`, `cart.sln` | `ci/templates/lang-dotnet.yml`, net-new |
 | Java | ad, fraud-detection | `build.gradle`, `build.gradle.kts` | Net-new |
 | Python | product-reviews, recommendation | `requirements.txt` | Net-new |
 | Rust | shipping | `Cargo.toml` | `ci/templates/lang-rust.yml` |
@@ -218,9 +218,9 @@ base images.
 | C++ | currency | `CMakeLists.txt` | Net-new |
 | Elixir | flagd-ui | `mix.exs` | Net-new |
 
-Four tiers of ten have a template today. The other six have none. ADR-0017 selects the
-full justified project-built inventory as the programme target, so those six tiers are
-selected work that has not been started; no schedule for them is claimed here.
+Five tiers of ten have a template today. The other five have none. ADR-0017 selects the
+full justified project-built inventory as the programme target, so those five tiers are
+selected work; no schedule for them is claimed here.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
 upstream binary with project-owned configuration, so no language-tier template applies to
@@ -233,7 +233,7 @@ and no service is claimed to have coverage it does not have.
 
 | Component | Test artefacts at the pinned tag | Kind |
 |---|---|---|
-| cart | `tests/CartServiceTests.cs`, `tests/cart.tests.csproj` | Unit, .NET |
+| cart | `tests/CartServiceTests.cs`, `tests/cart.tests.csproj` | Unit, .NET, all three skipped upstream |
 | checkout | `money/money_test.go` | Unit, Go, one package only |
 | flagd-ui | `test/flagd_ui/storage_test.exs`, four controller tests under `test/flagd_ui_web/controllers/`, `test/test_helper.exs`, `config/test.exs` | Unit and controller, Elixir |
 | frontend | `cypress.config.ts` with `Dockerfile.cypress` | Browser test harness configuration |
@@ -298,25 +298,31 @@ container registry, and a personal image namespace.
 | `services/frontend/ci.yml` | frontend | Node | Same contract. The other component the prior project had onboarded |
 | `services/payment/ci.yml` | payment | Node | Same contract. Carried because the Node tier template exists. It extends the parse template rather than the lint and type-check one, because the service declares no linter |
 
-Each declares `SERVICE_NAME`, `SERVICE_PATH`, and `LANG_TIER` only. The prior project's
+Each declares `SERVICE_NAME`, `SERVICE_PATH`, and `LANG_TIER`. The prior project's
 per-service files also carried `IMAGE_REPO` and `PROMOTE_REPO` pointing at its own registry
 and a personal image namespace. Neither is carried, and no registry coordinate is written into these files: the
 account-bearing host and the role arrive as masked CI variables instead. Where a service
-has no repository in the platform registry, as `product-catalog`, `frontend`, and
-`payment` do not, its image jobs stay unwired rather than pointing somewhere wrong.
+has no repository in the platform registry, as `product-catalog`, `frontend`, `payment` and
+`cart` do not, its publish and evidence jobs stay unwired rather than pointing somewhere
+wrong. `cart` still builds and scans, because neither stage touches the registry.
 
-Nine components have no per-service configuration, because their language tier has no
-template. `frontend-proxy` and `image-provider` have no application language, and each
-carries a per-service `ci.yml` regardless, because a container definition is enough to
-build, lint and scan.
+Eight components have no per-service configuration. Seven of them have a language tier with
+no template; accounting is the exception, because the .NET tier now has one and accounting
+is not yet wired to it. `frontend-proxy` and `image-provider` have no application
+language, and each carries a per-service `ci.yml` regardless, because a container
+definition is enough to build, lint and scan.
+
+`services/cart/ci.yml` is net-new rather than carried, and is the only per-service file
+that declares `SERVICE_DOCKERFILE`, because cart is the only component whose container
+definition is not at its service root.
 
 ### Not implemented
 
 ADR-0017 selects the full justified project-built inventory as the target of an
-owner-selected end-to-end programme. Selection is not delivery, and no work has begun on
-that breadth, so the following are recorded as not implemented:
+owner-selected end-to-end programme. Selection is not delivery, and .NET is the only tier of
+that breadth implemented so far, so the following are recorded as not implemented:
 
-- Language-tier templates for .NET, Java, Python, Ruby, C++, and Elixir.
+- Language-tier templates for Java, Python, Ruby, C++, and Elixir.
 - Image size budgets.
 
 Net-new and now implemented, executed for checkout, shipping and quote, and since then for image-provider:
@@ -331,8 +337,8 @@ Net-new and now implemented, executed for checkout, shipping and quote, and sinc
 Promote is declared as a stage and left unpopulated so the order stays visible, because
 promotion is a change to the GitOps repository rather than a pipeline job. Build and
 publish are populated for checkout, shipping, quote and image-provider, configured but not
-yet published for frontend-proxy, and unpopulated for the rest. No placeholder job was
-created.
+yet published for frontend-proxy, build-only for cart, and unpopulated for the rest. No
+placeholder job was created.
 
 ## Licensing and Attribution
 
@@ -377,11 +383,12 @@ upstream-derived files differ in content: the twenty-two container definitions r
 modified above, plus the eleven the preceding section records. Those eleven are what
 separates this result from the twenty-two figure, which counts modified container
 definitions only. The remaining three hundred and nineteen upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Nine files
+scope are byte-identical, and no upstream file in the scope is missing here. Ten files
 are present here and absent upstream: the per-service `ci.yml` under `checkout`,
-`product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`, and
-`image-provider`, and `services/frontend/eslint.config.mjs`. Those nine are project-added
-configuration with no upstream origin, so no modification notice applies to them. The flat ESLint
+`product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
+`image-provider`, and `cart`, and `services/frontend/eslint.config.mjs`. Those ten are
+project-added configuration with no upstream origin, so no modification notice applies to
+them. The flat ESLint
 configuration is project-added rather than a modification because ESLint 9 reads flat
 configuration only and upstream ships none; the upstream `.eslintrc` beside it is
 retained unmodified and still counts among the byte-identical files.

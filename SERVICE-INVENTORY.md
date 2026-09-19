@@ -9,10 +9,12 @@ quote each have build, scan, SBOM, artifact-publication and bounded runtime evid
 image-provider has build, scan, SBOM and artifact-publication evidence; it has no runtime
 evidence, because no runtime window has included it. Two publications carry a provenance
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
-is wired for build, scan, SBOM and container health and has published nothing. Evidence for the remaining twelve components is
+is wired for build, scan, SBOM and container health and has published nothing. cart is
+wired for build, scan and SBOM, has no container health job and has published nothing.
+Evidence for the remaining eleven components is
 unpopulated until the corresponding implementation and validation have actually occurred.
 Wiring is not execution, publication is not runtime evidence, and none of this is fleet-wide
-delivery: nine components have no pipeline configuration at all. Identity and
+delivery: eight components have no pipeline configuration at all. Identity and
 classification are facts about the source and are populated independently of that evidence.
 
 Five classes. Every component belongs to exactly one, and the class decides what evidence
@@ -28,7 +30,7 @@ hardening, the pipeline, and the evidence.
 |---|---|---|---|---|
 | accounting | .NET | `src/accounting` | Path-only modified | None |
 | ad | Java | `src/ad` | Path-only modified | None |
-| cart | .NET | `src/cart` | Path plus hardening | Unit, `tests/CartServiceTests.cs` |
+| cart | .NET | `src/cart` | Path plus hardening | Unit, `tests/CartServiceTests.cs`, all skipped upstream |
 | checkout | Go | `src/checkout` | Modified beyond path retarget | Unit, `money/money_test.go` |
 | currency | C++ | `src/currency` | Path plus hardening | None |
 | email | Ruby | `src/email` | Path plus hardening | None |
@@ -50,7 +52,7 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 |---|---|---|
 | Go | checkout, product-catalog | `ci/templates/lang-go.yml`, carried |
 | Node | frontend, payment | `ci/templates/lang-node.yml` |
-| .NET | accounting, cart | Net-new |
+| .NET | accounting, cart | `ci/templates/lang-dotnet.yml`, net-new |
 | Java | ad, fraud-detection | Net-new |
 | Python | product-reviews, recommendation | Net-new |
 | Rust | shipping | `ci/templates/lang-rust.yml`, net-new |
@@ -59,12 +61,14 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | C++ | currency | Net-new |
 | Elixir | flagd-ui | Net-new |
 
-Four tiers of ten have a template today. Six services are wired to the pipeline, and nine
-are not because their tier has no template. Eight components are wired in total, the two
-configured components in section 2 included. ADR-0017 selects the full justified
-project-built inventory as the target of an owner-selected end-to-end programme, so the
-remaining six tiers are selected work rather than work ruled out. None of that work has
-begun, and nothing here says those components are delivered.
+Five tiers of ten have a template today. Seven services are wired to the pipeline. Eight are
+not: seven because their tier has no template, and accounting because its .NET tier has one
+only as of this change and it has not been wired to it. Nine components are wired in
+total, the two configured components in section 2 included. ADR-0017 selects the full
+justified project-built inventory as the target of an owner-selected end-to-end programme,
+so the
+remaining five tiers are selected work rather than work ruled out. .NET was the first of the
+six to be implemented, and nothing here says those components are delivered.
 
 ## 2. Project-Built Configured Components
 
@@ -126,9 +130,10 @@ exception. It simply does not run.
 
 Sixteen items. No component carries the full set: checkout, shipping and quote carry most
 of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline items
-but none of the runtime ones, frontend-proxy carries its pipeline configuration alone, and
-the remaining twelve components carry none. Upstream or external image origin, classification,
-modification record, container definition or image source, reusable pipeline configuration
+but none of the runtime ones, frontend-proxy and cart each carry their pipeline
+configuration alone, and the remaining eleven components carry none. Upstream or external
+image origin, classification, modification record, container definition or image source,
+reusable pipeline configuration
 where project-built, build result where project-built, current scan result, SBOM where
 project-built, registry digest, desired-state digest that deploys it, runtime health,
 dependency purpose, telemetry presence where the component technically supports it, known
