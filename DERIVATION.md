@@ -304,7 +304,8 @@ and a personal image namespace. Neither is carried, and no registry coordinate i
 account-bearing host and the role arrive as masked CI variables instead. Where a service
 has no repository in the platform registry, as `product-catalog`, `frontend`, `payment` and
 `cart` do not, its publish and evidence jobs stay unwired rather than pointing somewhere
-wrong. `cart` still builds and scans, because neither stage touches the registry.
+wrong. `cart` is still wired through build and scan, because neither stage touches the
+registry.
 
 Eight components have no per-service configuration. Seven of them have a language tier with
 no template; accounting is the exception, because the .NET tier now has one and accounting
