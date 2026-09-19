@@ -86,14 +86,16 @@
     when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-      changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+      changes: ["${SERVICE_PATH}/**/*", "ci/templates/evidence-retain.yml"]
 
-# Runs on every pipeline, because a generator that is only exercised at publication time is
-# a generator nobody finds out is broken until the evidence matters.
+# Runs whenever the tools or their tests change, because a generator that is only exercised
+# at publication time is a generator nobody finds out is broken until the evidence matters.
+# The pattern ends in **/* rather than **: GitLab's matcher only spans directories for the
+# `**/` form, and a bare ** stopped this job from seeing its own tests directory.
 evidence-tools:test:
   stage: lint
   image: python:3.13-alpine
   script:
     - python3 -m unittest discover -s ci/tools/tests -v
   rules:
-    - changes: ["ci/tools/**", "ci/templates/evidence-retain.yml", ".gitlab-ci.yml"]
+    - changes: ["ci/tools/**/*", "ci/templates/evidence-retain.yml"]

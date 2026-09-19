@@ -43,7 +43,12 @@
       - build-job-id.txt
     expire_in: 1 day
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes:
+        - "${SERVICE_PATH}/**/*"
+        - "ci/templates/image.yml"
+        - "ci/templates/trivy-scan.yml"
+        - "ci/templates/ecr-publish.yml"
+        - "ci/templates/evidence-retain.yml"
 
 # What this proves is bounded: the image starts, stays up, and accepts a connection on
 # its port. It is not a functional test, and it deliberately points the service at
@@ -69,4 +74,4 @@
   after_script:
     - docker rm -f "${SERVICE_NAME}-health" || true
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/image.yml"]

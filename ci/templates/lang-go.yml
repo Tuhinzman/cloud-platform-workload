@@ -12,7 +12,7 @@
     - /go/bin/golangci-lint run ./...
     - go build ./...
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-go.yml"]
 
 # Separate from the lint template so a service opts in only where tests actually exist.
 # Extending it from a service with no test files would report a passing test job that
@@ -24,4 +24,4 @@
     - cd "${SERVICE_PATH}"
     - go test ./...
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-go.yml"]

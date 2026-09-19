@@ -3,7 +3,8 @@
 #
 # The linted file is resolved the same way the build resolves it, so a service whose
 # container definition is not at the conventional path is linted where it actually lives
-# rather than skipped. The rule lists both layouts for the same reason.
+# rather than skipped. `**/Dockerfile` matches zero directories as well, so one pattern
+# covers both layouts.
 
 .hadolint-template:
   stage: lint
@@ -12,8 +13,6 @@
     - hadolint --failure-threshold=error "${SERVICE_DOCKERFILE:-${SERVICE_PATH}/Dockerfile}"
   rules:
     - changes:
-        - "${SERVICE_PATH}/Dockerfile"
         - "${SERVICE_PATH}/**/Dockerfile"
         - "${SERVICE_PATH}/ci.yml"
-        - "ci/templates/**"
-        - ".gitlab-ci.yml"
+        - "ci/templates/hadolint.yml"

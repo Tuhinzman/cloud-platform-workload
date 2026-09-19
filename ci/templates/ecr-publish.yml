@@ -98,5 +98,8 @@
     expire_in: never
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-      changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+      changes:
+        - "${SERVICE_PATH}/**/*"
+        - "ci/templates/ecr-publish.yml"
+        - "ci/templates/evidence-retain.yml"
       when: manual

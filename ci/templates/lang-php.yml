@@ -31,4 +31,4 @@
     - composer validate --no-check-publish --no-check-lock
     - find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-php.yml"]

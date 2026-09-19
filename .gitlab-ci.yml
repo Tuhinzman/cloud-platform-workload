@@ -17,6 +17,24 @@
 # Secret detection is GitLab's own analyzer rather than the image scanner. It answers a
 # different question and is kept a separate control for that reason. Its stage is
 # overridden because this pipeline has no test stage.
+#
+# One pipeline per commit. Without workflow rules GitLab creates both a branch pipeline and
+# a merge request pipeline for the same push once a merge request is open, and the two
+# validate the same commit twice. Only the merge request pipeline compares changes against
+# the target branch; a branch pipeline on a new branch has no previous commit to compare
+# against, so every changes: rule evaluates to true and the whole fleet fans out. Branch
+# pipelines are therefore not created at all: a merge request is the unit of review here
+# and is opened by the push that creates the branch.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# GitLab's secret detection template runs in merge request pipelines only when this is set;
+# without it the job would have survived only on main once branch pipelines went away.
+variables:
+  AST_ENABLE_MR_PIPELINES: "true"
 
 stages:
   - lint

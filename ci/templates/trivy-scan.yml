@@ -80,4 +80,7 @@
     expire_in: never
     when: always
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+    - changes:
+        - "${SERVICE_PATH}/**/*"
+        - "ci/templates/trivy-scan.yml"
+        - "ci/templates/evidence-retain.yml"
