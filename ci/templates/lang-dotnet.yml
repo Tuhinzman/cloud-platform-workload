@@ -20,9 +20,10 @@
 # Two reproducibility limitations, both recorded rather than hidden. First, no locked
 # restore: --locked-mode is the .NET equivalent of cargo --locked or npm ci and it requires
 # a packages.lock.json, which no service here commits, so restore resolves package versions
-# at job time. Second, the runtime identifier is inferred: cart sets SelfContained with no
-# RuntimeIdentifier, so the SDK picks one from the runner and the same script produced
-# linux-arm64 and linux-x64 on two architectures. Neither is an oversight, and together
+# at job time. Second, the runtime identifier is inferred wherever a service sets
+# SelfContained without one: the SDK then picks a target from the runner, and the same
+# script produced linux-arm64 and linux-x64 on two architectures. Neither is an oversight,
+# and together
 # they are what this tier does not carry that the Go, Node and Rust tiers do.
 #
 # The project or solution is discovered rather than named, so no service file name appears
