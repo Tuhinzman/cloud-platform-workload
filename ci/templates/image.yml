@@ -4,6 +4,13 @@
 # controls every container on that host, which is the pattern this project rejected, and
 # the dind service needs no runner of our own.
 #
+# The dind daemon is started with --mtu=1400. Its bridge would otherwise default to 1500
+# while the hosted runners sit on Google Cloud, whose network MTU is 1460 and which drops
+# larger packets rather than fragmenting them. A build container that advertises a segment
+# size the path cannot carry hangs on any server that does not honour path MTU discovery,
+# and one package index that never answered ran to the job timeout before this was set.
+# 1400 is the value GitLab's hosted-runner documentation gives for this problem.
+#
 # The build stays local. Nothing reaches the registry before the scan gate has run, so
 # the image travels to the later stages as a saved tar artifact rather than a registry
 # tag, and a blocked pipeline publishes nothing.
@@ -21,16 +28,22 @@
 .docker-dind:
   image: docker:28-cli
   services:
-    - docker:28-dind
+    - name: docker:28-dind
+      command: ["--mtu=1400"]
   variables:
     DOCKER_HOST: tcp://docker:2376
     DOCKER_TLS_CERTDIR: "/certs"
     DOCKER_TLS_VERIFY: "1"
     DOCKER_CERT_PATH: "/certs/client"
 
+# A twenty-minute ceiling, one third of GitLab's default. It is a cost bound, not the fix:
+# no healthy build here has needed a quarter of it, and a package source that never answers
+# would otherwise run to the hour, because NuGet's retry knob was measured not to end a
+# restore against a black-holed source inside fifteen minutes at any setting.
 .image-build-template:
   extends: .docker-dind
   stage: build
+  timeout: 20m
   script:
     - docker build ${BUILD_ARGS} -f "${SERVICE_DOCKERFILE:-${SERVICE_PATH}/Dockerfile}" -t "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" .
     - docker save -o image.tar "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
