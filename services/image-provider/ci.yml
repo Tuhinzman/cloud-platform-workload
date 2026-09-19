@@ -56,8 +56,13 @@ image-provider:health-test:
 
 image-provider:publish:
   extends: .ecr-publish-template
-  dependencies:
-    - image-provider:build
+  # The scan is a prerequisite, not an ordering preference. GitLab refuses to create a
+  # pipeline whose job needs one that is not in it, so a rule change that dropped the gate
+  # would fail the pipeline instead of producing a publishable image that nothing scanned.
+  needs:
+    - job: image-provider:build
+    - job: image-provider:scan-image
+      artifacts: false
   variables:
     <<: *image-provider-vars
     ECR_REPOSITORY: astroshop/image-provider
@@ -66,7 +71,6 @@ image-provider:retain-evidence:
   extends: .evidence-retain-template
   needs:
     - job: image-provider:scan-image
-      optional: true
     - job: image-provider:publish
   variables:
     <<: *image-provider-vars

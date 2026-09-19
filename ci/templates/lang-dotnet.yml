@@ -43,6 +43,8 @@
 
 .lang-dotnet-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: mcr.microsoft.com/dotnet/sdk:10.0
   script:
     - cd "${SERVICE_PATH}"
@@ -50,7 +52,7 @@
     - dotnet restore
     - dotnet build --no-restore -c Release
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-dotnet.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-dotnet.yml"]
 
 # Separate from the lint template so a service opts in only where tests actually exist.
 # Extending it from a service with no test files would report a passing test job that
@@ -62,9 +64,11 @@
 # instead of a test result.
 .lang-dotnet-test-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: mcr.microsoft.com/dotnet/sdk:10.0
   script:
     - cd "${SERVICE_PATH}"
     - dotnet test
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-dotnet.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-dotnet.yml"]

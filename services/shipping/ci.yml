@@ -64,8 +64,13 @@ shipping:health-test:
 
 shipping:publish:
   extends: .ecr-publish-template
-  dependencies:
-    - shipping:build
+  # The scan is a prerequisite, not an ordering preference. GitLab refuses to create a
+  # pipeline whose job needs one that is not in it, so a rule change that dropped the gate
+  # would fail the pipeline instead of producing a publishable image that nothing scanned.
+  needs:
+    - job: shipping:build
+    - job: shipping:scan-image
+      artifacts: false
   variables:
     <<: *shipping-vars
     ECR_REPOSITORY: astroshop/shipping
@@ -74,7 +79,6 @@ shipping:retain-evidence:
   extends: .evidence-retain-template
   needs:
     - job: shipping:scan-image
-      optional: true
     - job: shipping:publish
   variables:
     <<: *shipping-vars

@@ -48,6 +48,7 @@
   image: python:3.13-alpine
   variables:
     COMPONENT_CLASS: project-built-application-service
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   script:
     - |
       python3 ci/tools/evidence_manifest.py \
@@ -86,7 +87,13 @@
     when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-      changes: ["${SERVICE_PATH}/**/*", "ci/templates/evidence-retain.yml"]
+      changes:
+        - "${SERVICE_PATH}/**/*"
+        - "${SERVICE_SHARED_INPUTS}"
+        - "ci/templates/image.yml"
+        - "ci/templates/trivy-scan.yml"
+        - "ci/templates/ecr-publish.yml"
+        - "ci/templates/evidence-retain.yml"
 
 # Runs whenever the tools or their tests change, because a generator that is only exercised
 # at publication time is a generator nobody finds out is broken until the evidence matters.
@@ -101,4 +108,8 @@ evidence-tools:test:
   script:
     - python3 -m unittest discover -s ci/tools/tests -v
   rules:
-    - changes: ["ci/tools/**/*", "ci/templates/evidence-retain.yml"]
+    - changes:
+        - "ci/tools/**/*"
+        - "ci/templates/**/*"
+        - "services/*/ci.yml"
+        - ".gitlab-ci.yml"

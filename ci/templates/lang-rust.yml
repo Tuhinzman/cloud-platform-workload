@@ -16,6 +16,8 @@
 
 .lang-rust-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: rust:1.91
   script:
     - cd "${SERVICE_PATH}"
@@ -24,16 +26,18 @@
     - cargo clippy --locked --all-targets -- -D warnings
     - cargo build --locked
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-rust.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-rust.yml"]
 
 # Separate from the lint template so a service opts in only where tests actually exist.
 # Extending it from a service with no test files would report a passing test job that
 # asserted nothing.
 .lang-rust-test-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: rust:1.91
   script:
     - cd "${SERVICE_PATH}"
     - cargo test --locked
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-rust.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-rust.yml"]

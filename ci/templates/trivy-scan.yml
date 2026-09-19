@@ -32,6 +32,7 @@
   variables:
     TRIVY_CACHE_DIR: .trivycache
     TRIVY_NO_PROGRESS: "true"
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   cache:
     key: trivy-db-0.70.0
     paths:
@@ -82,5 +83,8 @@
   rules:
     - changes:
         - "${SERVICE_PATH}/**/*"
+        - "${SERVICE_SHARED_INPUTS}"
+        - "ci/templates/image.yml"
         - "ci/templates/trivy-scan.yml"
+        - "ci/templates/ecr-publish.yml"
         - "ci/templates/evidence-retain.yml"

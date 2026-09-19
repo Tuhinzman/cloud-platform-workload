@@ -11,6 +11,8 @@
 
 .lang-node-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: node:22-alpine
   script:
     - cd "${SERVICE_PATH}"
@@ -18,7 +20,7 @@
     - npx --no eslint .
     - npx --no tsc --noEmit
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-node.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-node.yml"]
 
 # For a Node service that declares no static-analysis tooling of its own. Extending the
 # template above from such a service would report on a configuration that exists nowhere in
@@ -33,6 +35,8 @@
 
 .lang-node-parse-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: node:22-alpine
   script:
     - cd "${SERVICE_PATH}"
@@ -40,4 +44,4 @@
     - test -s /tmp/js-files
     - xargs -0 -n1 node --check < /tmp/js-files
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-node.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-node.yml"]

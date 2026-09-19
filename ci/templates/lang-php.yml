@@ -24,6 +24,8 @@
 
 .lang-php-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: composer:2.8.12
   script:
     - cd "${SERVICE_PATH}"
@@ -31,4 +33,4 @@
     - composer validate --no-check-publish --no-check-lock
     - find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-php.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-php.yml"]

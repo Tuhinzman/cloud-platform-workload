@@ -47,6 +47,11 @@
   extends: .docker-dind
   stage: build
   timeout: 20m
+  variables:
+    # A service that COPYs a shared directory into its image is not rebuilt by a change to
+    # that directory unless it says so, because the rule can only see ${SERVICE_PATH}. The
+    # default repeats a path the rule already carries, so declaring nothing changes nothing.
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   script:
     - docker build ${BUILD_ARGS} -f "${SERVICE_DOCKERFILE:-${SERVICE_PATH}/Dockerfile}" -t "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" .
     - docker save -o image.tar "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
@@ -61,6 +66,7 @@
   rules:
     - changes:
         - "${SERVICE_PATH}/**/*"
+        - "${SERVICE_SHARED_INPUTS}"
         - "ci/templates/image.yml"
         - "ci/templates/trivy-scan.yml"
         - "ci/templates/ecr-publish.yml"
@@ -76,6 +82,8 @@
 .image-health-template:
   extends: .docker-dind
   stage: health-test
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   script:
     - docker load -i image.tar
     - docker run -d --name "${SERVICE_NAME}-health" -p "${HEALTH_PORT}:${HEALTH_PORT}" ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
@@ -90,4 +98,4 @@
   after_script:
     - docker rm -f "${SERVICE_NAME}-health" || true
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/image.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/image.yml"]

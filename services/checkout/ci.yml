@@ -60,8 +60,13 @@ checkout:health-test:
 
 checkout:publish:
   extends: .ecr-publish-template
-  dependencies:
-    - checkout:build
+  # The scan is a prerequisite, not an ordering preference. GitLab refuses to create a
+  # pipeline whose job needs one that is not in it, so a rule change that dropped the gate
+  # would fail the pipeline instead of producing a publishable image that nothing scanned.
+  needs:
+    - job: checkout:build
+    - job: checkout:scan-image
+      artifacts: false
   variables:
     <<: *checkout-vars
     ECR_REPOSITORY: astroshop/checkout
@@ -70,7 +75,6 @@ checkout:retain-evidence:
   extends: .evidence-retain-template
   needs:
     - job: checkout:scan-image
-      optional: true
     - job: checkout:publish
   variables:
     <<: *checkout-vars

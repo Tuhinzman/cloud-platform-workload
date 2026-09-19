@@ -14,10 +14,14 @@
 # Manual on purpose. Enabling CI/CD must not publish anything by itself, and the first
 # digest is a separately authorized step.
 #
-# The rule carries the same changes gate the build and scan jobs use, so this job exists
-# only in pipelines that actually built the service. Without it a docs-only commit created
-# a blocking manual job with no image.tar behind it: unplayable, and it held the pipeline
-# at the publish stage for nothing.
+# Publication is gated twice, and only the second gate is structural. The rule carries the
+# same changes list as the other three artifact-chain templates, so this job exists only in
+# pipelines that also build and scan the service; without it a docs-only commit created a
+# blocking manual job with no image.tar behind it. But a shared list is a convention, and
+# these four lists had already drifted apart once, leaving a reachable pipeline that
+# offered publish with no scan in it. So each service's publish job also names its scan as
+# a mandatory need. GitLab refuses to create a pipeline whose job needs one that is absent,
+# which turns that drift from a silent hole into a pipeline that does not start.
 #
 # The raw registry manifest is retained because the published digest is the SHA-256 of
 # exactly those bytes. Keeping them is what lets a later reader recompute the digest
@@ -35,6 +39,7 @@
       aud: sts.amazonaws.com
   variables:
     AWS_REGION: us-east-1
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   before_script:
     - apk add --no-cache aws-cli
   script:
@@ -100,6 +105,9 @@
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
         - "${SERVICE_PATH}/**/*"
+        - "${SERVICE_SHARED_INPUTS}"
+        - "ci/templates/image.yml"
+        - "ci/templates/trivy-scan.yml"
         - "ci/templates/ecr-publish.yml"
         - "ci/templates/evidence-retain.yml"
       when: manual

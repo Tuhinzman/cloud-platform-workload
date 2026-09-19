@@ -27,6 +27,10 @@
   SERVICE_PATH: services/cart
   LANG_TIER: dotnet
   SERVICE_DOCKERFILE: services/cart/src/Dockerfile
+  # cart compiles pb/demo.proto into its gRPC stubs and COPYs pb/ into the image, so a
+  # change to the shared contract changes what cart builds. It is the only wired component
+  # with a build job that consumes it.
+  SERVICE_SHARED_INPUTS: pb/**/*
 
 cart:lint-dockerfile:
   extends: .hadolint-template

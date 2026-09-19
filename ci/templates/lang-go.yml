@@ -3,6 +3,8 @@
 
 .lang-go-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: golang:1.25.10-bookworm
   script:
     - cd "${SERVICE_PATH}"
@@ -12,16 +14,18 @@
     - /go/bin/golangci-lint run ./...
     - go build ./...
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-go.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-go.yml"]
 
 # Separate from the lint template so a service opts in only where tests actually exist.
 # Extending it from a service with no test files would report a passing test job that
 # asserted nothing.
 .lang-go-test-template:
   stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   image: golang:1.25.10-bookworm
   script:
     - cd "${SERVICE_PATH}"
     - go test ./...
   rules:
-    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/lang-go.yml"]
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-go.yml"]
