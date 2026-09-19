@@ -4,12 +4,15 @@
 # controls every container on that host, which is the pattern this project rejected, and
 # the dind service needs no runner of our own.
 #
-# The dind daemon is started with --mtu=1400. Its bridge would otherwise default to 1500
-# while the hosted runners sit on Google Cloud, whose network MTU is 1460 and which drops
-# larger packets rather than fragmenting them. A build container that advertises a segment
-# size the path cannot carry hangs on any server that does not honour path MTU discovery,
-# and one package index that never answered ran to the job timeout before this was set.
-# 1400 is the value GitLab's hosted-runner documentation gives for this problem.
+# The dind daemon is started with --mtu=1360, and the number is not a guess. GitLab lowered
+# its hosted-runner network MTU to 1360 in May 2026, and the inner Docker daemon creates
+# its own bridge at the default 1500 rather than inheriting that, so a build container
+# advertises a segment size the path cannot carry. Servers that honour path MTU discovery
+# recover; api.nuget.org behind Microsoft Front Door filters the ICMP it would need and
+# hangs instead, which is how one package index that never answered ran a cart build to
+# the job timeout six times. 1400 was tried first and still hung, since it is above 1360.
+# GitLab documents the value and the alternative FF_NETWORK_PER_BUILD; the flag is used
+# because it is one line in the one place every build shares.
 #
 # The build stays local. Nothing reaches the registry before the scan gate has run, so
 # the image travels to the later stages as a saved tar artifact rather than a registry
@@ -29,7 +32,7 @@
   image: docker:28-cli
   services:
     - name: docker:28-dind
-      command: ["--mtu=1400"]
+      command: ["--mtu=1360"]
   variables:
     DOCKER_HOST: tcp://docker:2376
     DOCKER_TLS_CERTDIR: "/certs"
