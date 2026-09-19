@@ -1,0 +1,54 @@
+# .NET static validation. The SDK image matches the builder stage of the service
+# Dockerfile, so this job compiles on the same toolchain the image build uses.
+#
+# It does not predict the image build, and the Go and Rust tiers' claim to do so does not
+# carry over. Those tiers compile what their Dockerfile compiles; here the Dockerfile runs
+# `dotnet publish -r linux-musl-$TARGETARCH` into an Alpine runtime base while this job
+# runs a portable glibc build. The restore graphs differ, so this job gates the source and
+# the analyzers, and the image build remains the only check of the musl target.
+#
+# Release, not the default Debug. The services set AnalysisMode and TreatWarningsAsErrors
+# under Release in their own Directory.Build.props, so Release is the configuration in
+# which the analyzers actually gate. A Debug build compiles the same code and enforces
+# nothing, which would make this job look like a check while being none.
+#
+# No separate linter and no formatter gate. The Roslyn analyzers the SDK already runs are
+# the .NET equivalent of the linter the Go and Rust tiers install, and neither the Go nor
+# the Node tier checks formatting, so adding one here would apply a control to .NET that
+# the rest of the repository does not carry.
+#
+# Two reproducibility limitations, both recorded rather than hidden. First, no locked
+# restore: --locked-mode is the .NET equivalent of cargo --locked or npm ci and it requires
+# a packages.lock.json, which no service here commits, so restore resolves package versions
+# at job time. Second, the runtime identifier is inferred: cart sets SelfContained with no
+# RuntimeIdentifier, so the SDK picks one from the runner and the same script produced
+# linux-arm64 and linux-x64 on two architectures. Neither is an oversight, and together
+# they are what this tier does not carry that the Go, Node and Rust tiers do.
+#
+# The project or solution is discovered rather than named, so no service file name appears
+# in the shared tier. NuGetAudit stays wherever the service's own Directory.Build.props
+# puts it: restore prints its findings into this job's log, and the tier neither raises
+# nor lowers that setting.
+
+.lang-dotnet-template:
+  stage: lint
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script:
+    - cd "${SERVICE_PATH}"
+    - dotnet --version
+    - dotnet restore
+    - dotnet build --no-restore -c Release
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]
+
+# Separate from the lint template so a service opts in only where tests actually exist.
+# Extending it from a service with no test files would report a passing test job that
+# asserted nothing.
+.lang-dotnet-test-template:
+  stage: lint
+  image: mcr.microsoft.com/dotnet/sdk:10.0
+  script:
+    - cd "${SERVICE_PATH}"
+    - dotnet test
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "ci/templates/**", ".gitlab-ci.yml"]

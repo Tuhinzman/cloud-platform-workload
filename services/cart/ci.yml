@@ -1,0 +1,60 @@
+# Declarative configuration for cart. Behaviour lives in ci/templates.
+#
+# SERVICE_DOCKERFILE names the container definition because cart keeps it at src/Dockerfile
+# rather than the conventional service root, which the image and hadolint templates already
+# resolve through this variable.
+#
+# There is no health job, and the omission is measured rather than an oversight. cart
+# requires VALKEY_ADDR at startup and resolves it eagerly: Program.cs:98 takes the store
+# out of the container before app.Run(), so ValkeyCartStore.Initialize() runs before
+# Kestrel listens. Pointed at an address that does not resolve, the process does not start
+# degraded - it throws ApplicationException "Wasn't able to connect to redis" from
+# EnsureRedisConnected() at cartstore/ValkeyCartStore.cs:101 and the container exits. The
+# shared health template proves that a container starts and accepts a connection on its
+# port, and it deliberately points services at addresses that do not resolve, so it cannot
+# express what cart needs. The alternative, standing a datastore beside the job, would pick
+# a datastore image identity while that product choice is still a deferred owner decision,
+# so the health stage stays unclaimed rather than being satisfied by a cart-local
+# workaround.
+#
+# There is no publish or evidence job. Those stages need an ECR repository for cart, and no
+# repository exists or is authorized. Nothing here is blocked on the pipeline.
+
+.cart-vars: &cart-vars
+  SERVICE_NAME: cart
+  SERVICE_PATH: services/cart
+  LANG_TIER: dotnet
+  SERVICE_DOCKERFILE: services/cart/src/Dockerfile
+
+cart:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *cart-vars
+
+cart:lint-dotnet:
+  extends: .lang-dotnet-template
+  variables:
+    <<: *cart-vars
+
+# cart ships a test project, so it opts into the test tier. Every test in it carries
+# [Fact(Skip = ...)] upstream, so the job discovers three and asserts none: it reports
+# "Skipped!" rather than a pass. It is wired anyway because the skip is upstream state that
+# can change, and an unwired tier would not notice if it did.
+cart:test-dotnet:
+  extends: .lang-dotnet-test-template
+  variables:
+    <<: *cart-vars
+
+cart:build:
+  extends: .image-build-template
+  variables:
+    <<: *cart-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+cart:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - cart:build
+  variables:
+    <<: *cart-vars
