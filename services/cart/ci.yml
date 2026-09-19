@@ -12,10 +12,11 @@
 # EnsureRedisConnected() at cartstore/ValkeyCartStore.cs:101 and the container exits. The
 # shared health template proves that a container starts and accepts a connection on its
 # port, and it deliberately points services at addresses that do not resolve, so it cannot
-# express what cart needs. The alternative, standing a datastore beside the job, would pick
-# a datastore image identity while that product choice is still a deferred owner decision,
-# so the health stage stays unclaimed rather than being satisfied by a cart-local
-# workaround.
+# express what cart needs. Standing a cache beside the job would not be a cart-local fix:
+# it would change what the health stage validates for every component, from starting
+# without the fleet to starting with a dependency present. That is a shared decision about
+# the health model, not this file's to make, so the stage is recorded as a measured
+# exception and cart's readiness is left to the runtime that actually has a cache.
 #
 # There is no publish or evidence job. Those stages need an ECR repository for cart, and no
 # repository exists or is authorized. Nothing here is blocked on the pipeline.
