@@ -9,8 +9,9 @@ quote each have build, scan, SBOM, artifact-publication and bounded runtime evid
 image-provider has build, scan, SBOM and artifact-publication evidence; it has no runtime
 evidence, because no runtime window has included it. Two publications carry a provenance
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
-is wired for build, scan, SBOM and container health and has published nothing. cart is
-wired for build, scan and SBOM, has no container health job and has published nothing.
+is wired for build, scan, SBOM and container health and has published nothing. cart has
+executed build, scan and SBOM on a pipeline that passed, has no container health job,
+and has published nothing: no registry repository, no digest, no promotion, no runtime.
 Evidence for the remaining eleven components is unpopulated until the corresponding
 implementation and validation have actually occurred. Wiring is not execution,
 publication is not runtime evidence, and none of this is fleet-wide delivery: eight
@@ -130,11 +131,12 @@ exception. It simply does not run.
 
 Sixteen items. No component carries the full set: checkout, shipping and quote carry
 most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
-items but none of the runtime ones, frontend-proxy and cart each carry their pipeline
-configuration alone, and the remaining eleven components carry none. Upstream or
-external image origin, classification, modification record, container definition or
-image source, reusable pipeline configuration where project-built, build result where
-project-built, current scan result, SBOM where project-built, registry digest,
+items but none of the runtime ones, frontend-proxy carries its pipeline configuration
+alone, cart carries its pipeline configuration and an executed build, scan and SBOM with
+no publication or runtime behind them, and the remaining eleven components carry none.
+Upstream or external image origin, classification, modification record, container
+definition or image source, reusable pipeline configuration where project-built, build
+result where project-built, current scan result, SBOM where project-built, registry digest,
 desired-state digest that deploys it, runtime health, dependency purpose, telemetry
 presence where the component technically supports it, known limitations, any active
 security exception, and teardown result.

@@ -150,6 +150,31 @@ def pipeline_created(config: dict, ctx: dict) -> bool | None:
     return False
 
 
+def needs_of(job: dict) -> list[tuple[str, bool]]:
+    """(needed job name, optional) pairs. GitLab defaults optional to false."""
+    out = []
+    for entry in job.get("needs") or []:
+        if isinstance(entry, str):
+            out.append((entry, False))
+        else:
+            out.append((entry["job"], bool(entry.get("optional", False))))
+    return out
+
+
+def validate_needs(config: dict, jobs: list[dict]) -> list[str]:
+    """GitLab refuses to create a pipeline whose job needs one that is not in it, unless the
+    need is marked optional. That refusal is what makes a missing prerequisite fail closed
+    rather than silently produce a job with nothing in front of it."""
+    present = {j["job"] for j in jobs}
+    errors = []
+    for name in sorted(present):
+        for needed, optional in needs_of(resolve(config, name)):
+            if optional or needed in present:
+                continue
+            errors.append(f"{name} needs {needed}, but {needed} is not in the pipeline")
+    return errors
+
+
 def evaluate(config: dict, changed: list[str], ctx: dict) -> tuple[list[dict], list[str]]:
     jobs, unknown = [], []
     if pipeline_created(config, ctx) is False:
@@ -194,6 +219,11 @@ def main() -> int:
     print(f"-- {len(jobs)} jobs")
     for line in unknown:
         print(f"UNKNOWN {line}", file=sys.stderr)
+    errors = validate_needs(config, jobs)
+    for line in errors:
+        print(f"INVALID {line}", file=sys.stderr)
+    if errors:
+        return 3
     return 2 if unknown else 0
 
 
