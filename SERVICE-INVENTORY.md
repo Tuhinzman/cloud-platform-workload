@@ -11,11 +11,11 @@ evidence, because no runtime window has included it. Two publications carry a pr
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
 is wired for build, scan, SBOM and container health and has published nothing. cart is
 wired for build, scan and SBOM, has no container health job and has published nothing.
-Evidence for the remaining eleven components is
-unpopulated until the corresponding implementation and validation have actually occurred.
-Wiring is not execution, publication is not runtime evidence, and none of this is fleet-wide
-delivery: eight components have no pipeline configuration at all. Identity and
-classification are facts about the source and are populated independently of that evidence.
+Evidence for the remaining eleven components is unpopulated until the corresponding
+implementation and validation have actually occurred. Wiring is not execution,
+publication is not runtime evidence, and none of this is fleet-wide delivery: eight
+components have no pipeline configuration at all. Identity and classification are facts
+about the source and are populated independently of that evidence.
 
 Five classes. Every component belongs to exactly one, and the class decides what evidence
 it owes.
@@ -61,14 +61,14 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | C++ | currency | Net-new |
 | Elixir | flagd-ui | Net-new |
 
-Five tiers of ten have a template today. Seven services are wired to the pipeline. Eight are
-not: seven because their tier has no template, and accounting because its .NET tier has one
-only as of this change and it has not been wired to it. Nine components are wired in
-total, the two configured components in section 2 included. ADR-0017 selects the full
-justified project-built inventory as the target of an owner-selected end-to-end programme,
-so the
-remaining five tiers are selected work rather than work ruled out. .NET was the first of the
-six to be implemented, and nothing here says those components are delivered.
+Five tiers of ten have a template today. Seven services are wired to the pipeline. Eight
+are not: seven because their tier has no template, and accounting because its .NET tier
+has one only as of this change and it has not been wired to it. Nine components are
+wired in total, the two configured components in section 2 included. ADR-0017 selects
+the full justified project-built inventory as the target of an owner-selected end-to-end
+programme, so the remaining five tiers are selected work rather than work ruled out.
+.NET was the first of the six to be implemented, and nothing here says those components
+are delivered.
 
 ## 2. Project-Built Configured Components
 
@@ -128,16 +128,16 @@ exception. It simply does not run.
 
 ## Evidence Owed by Every Deployed Component
 
-Sixteen items. No component carries the full set: checkout, shipping and quote carry most
-of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline items
-but none of the runtime ones, frontend-proxy and cart each carry their pipeline
-configuration alone, and the remaining eleven components carry none. Upstream or external
-image origin, classification, modification record, container definition or image source,
-reusable pipeline configuration
-where project-built, build result where project-built, current scan result, SBOM where
-project-built, registry digest, desired-state digest that deploys it, runtime health,
-dependency purpose, telemetry presence where the component technically supports it, known
-limitations, any active security exception, and teardown result.
+Sixteen items. No component carries the full set: checkout, shipping and quote carry
+most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
+items but none of the runtime ones, frontend-proxy and cart each carry their pipeline
+configuration alone, and the remaining eleven components carry none. Upstream or
+external image origin, classification, modification record, container definition or
+image source, reusable pipeline configuration where project-built, build result where
+project-built, current scan result, SBOM where project-built, registry digest,
+desired-state digest that deploys it, runtime health, dependency purpose, telemetry
+presence where the component technically supports it, known limitations, any active
+security exception, and teardown result.
 
 ## Evidence Owed by Paths Rather Than Components
 

@@ -21,10 +21,20 @@
 # restore: --locked-mode is the .NET equivalent of cargo --locked or npm ci and it requires
 # a packages.lock.json, which no service here commits, so restore resolves package versions
 # at job time. Second, the runtime identifier is inferred wherever a service sets
-# SelfContained without one: the SDK then picks a target from the runner, and the same
-# script produced linux-arm64 and linux-x64 on two architectures. Neither is an oversight,
-# and together
-# they are what this tier does not carry that the Go, Node and Rust tiers do.
+# SelfContained without one: the SDK picks a target from the host it runs on, which in a
+# local check on two architectures produced linux-arm64 and linux-x64 from this same
+# script. Neither is an oversight, and together they are what this tier does not carry
+# that the Go, Node and Rust tiers do.
+#
+# Restore is its own step, and that placement decides what the project's NuGetAudit
+# settings do. A service's Directory.Build.props may set TreatWarningsAsErrors under
+# Release, and restoring under Release then turns an audit advisory into a build error:
+# measured locally on cart, `dotnet build -c Release` and `dotnet restore -c Release` both
+# fail on a known high-severity advisory, while restoring first and building with
+# --no-restore does not. This tier restores first on purpose, because that is the shape the
+# service Dockerfiles already use, so the tier reports what the image build would report
+# rather than applying a stricter gate than the artifact it predicts. Whether an advisory
+# should block is a security-policy question and is not settled here.
 #
 # The project or solution is discovered rather than named, so no service file name appears
 # in the shared tier. NuGetAudit stays wherever the service's own Directory.Build.props
@@ -45,6 +55,11 @@
 # Separate from the lint template so a service opts in only where tests actually exist.
 # Extending it from a service with no test files would report a passing test job that
 # asserted nothing.
+#
+# No configuration flag, so tests run in the default one. The Go and Rust test tiers do the
+# same, and forcing Release here would restore under Release and fail on the audit
+# advisories described above, which would make a test job report a dependency finding
+# instead of a test result.
 .lang-dotnet-test-template:
   stage: lint
   image: mcr.microsoft.com/dotnet/sdk:10.0

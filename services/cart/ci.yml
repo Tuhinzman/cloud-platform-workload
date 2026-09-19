@@ -12,11 +12,12 @@
 # EnsureRedisConnected() at cartstore/ValkeyCartStore.cs:101 and the container exits. The
 # shared health template proves that a container starts and accepts a connection on its
 # port, and it deliberately points services at addresses that do not resolve, so it cannot
-# express what cart needs. Standing a cache beside the job would not be a cart-local fix:
-# it would change what the health stage validates for every component, from starting
-# without the fleet to starting with a dependency present. That is a shared decision about
-# the health model, not this file's to make, so the stage is recorded as a measured
-# exception and cart's readiness is left to the runtime that actually has a cache.
+# express what cart needs. A dependency container could be attached to this job alone, so
+# the obstacle is not mechanical. It is that doing so would make cart the first component
+# whose health job starts its dependencies, which is a change to what the stage means
+# rather than a change to one service's configuration. That belongs to a decision about the
+# health model, so the stage is recorded as a measured exception and cart's readiness is
+# left to the runtime that actually has a cache.
 #
 # There is no publish or evidence job. Those stages need an ECR repository for cart, and no
 # repository exists or is authorized. Nothing here is blocked on the pipeline.
@@ -37,10 +38,10 @@ cart:lint-dotnet:
   variables:
     <<: *cart-vars
 
-# cart ships a test project, so it opts into the test tier. Every test in it carries
-# [Fact(Skip = ...)] upstream, so the job discovers three and asserts none: it reports
-# "Skipped!" rather than a pass. It is wired anyway because the skip is upstream state that
-# can change, and an unwired tier would not notice if it did.
+# cart ships a test project, so it opts into the test tier. All three tests in it carry
+# [Fact(Skip = ...)] upstream, so the job will discover three and assert none. It is wired
+# anyway because the skip is upstream state that can change, and an unwired tier would not
+# notice if it did.
 cart:test-dotnet:
   extends: .lang-dotnet-test-template
   variables:

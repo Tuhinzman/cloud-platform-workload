@@ -60,25 +60,24 @@ Upstream wrote this application and none of it is claimed as this project's work
 the tree.
 
 The pipeline now has shared templates for Go, Node, PHP, Rust and .NET, but validation
-coverage is not uniform across the fleet. Checkout has an executed and passing Dockerfile
-lint path. Shipping and quote have executed validated build, scan, SBOM, and container
-health paths. Frontend, payment, and product-catalog have executed pipelines that reach the
-lint stage only. frontend-proxy and image-provider are wired through the same shared
-templates for build, scan, SBOM and container health; neither carries a language tier,
-because neither directory holds application source. cart is wired through the shared
-templates for Dockerfile lint, .NET lint, tests, build, scan and SBOM. Its three upstream
-tests all carry a skip, so that job asserts nothing today. It carries no
+coverage is not uniform across the fleet. Checkout has an executed and passing
+Dockerfile lint path. Shipping and quote have executed validated build, scan, SBOM, and
+container health paths. Frontend, payment, and product-catalog have executed pipelines
+that reach the lint stage only. frontend-proxy and image-provider are wired through the
+same shared templates for build, scan, SBOM and container health; neither carries a
+language tier, because neither directory holds application source. cart is wired through
+the shared templates for Dockerfile lint, .NET lint, tests, build, scan and SBOM. Its
+three upstream tests all carry a skip, so that job asserts nothing today. It carries no
 container health job: it requires its cache at startup and exits when that address does
 not resolve, which the shared health template cannot express, and its `ci.yml` records
-that. The product-catalog Go lint job is now
-configured as blocking and its latest validated run reports no findings. payment declares
-no linter and no TypeScript, so
-it extends a Node parse check rather than a lint, which asserts only that every `.js` file
+that. The product-catalog Go lint job is now configured as blocking and its latest
+validated run reports no findings. payment declares no linter and no TypeScript, so it
+extends a Node parse check rather than a lint, which asserts only that every `.js` file
 in the service directory parses; that job is now configured as blocking and its first
 validated run passed. The frontend Node lint job is blocking: the service now carries a
-project-added flat ESLint configuration, and the latest validated run on main reports zero
-errors and twelve reported-but-unremediated warnings, with the TypeScript check reached and
-passing.
+project-added flat ESLint configuration, and the latest validated run on main reports
+zero errors and twelve reported-but-unremediated warnings, with the TypeScript check
+reached and passing.
 
 Checkout, shipping and quote have each completed build, scan, SBOM and artifact-publication
 stages, and each published digest was read back independently from the registry.

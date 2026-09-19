@@ -284,7 +284,7 @@ container registry, and a personal image namespace.
 | Carried artefact | Origin | Why it is valid here |
 |---|---|---|
 | Stage order in `.gitlab-ci.yml` | Prior project root pipeline | Matches the stage sequence ADR-0009 requires and carries no environment assumption |
-| `ci/templates/hadolint.yml` | Prior project | Reusable Dockerfile linting template for the delivery model. Extended by every wired service, so its jobs execute today |
+| `ci/templates/hadolint.yml` | Prior project | Reusable Dockerfile linting template for the delivery model. Extended by every wired service; its jobs have executed for the services wired before cart |
 | `ci/templates/lang-go.yml` | Prior project | Module download, lint, and compile check. Runs today against checkout and product-catalog |
 | `ci/templates/lang-node.yml` | Prior project | Dependency install, lint, and type check, carried and extended today by frontend alone. The type check runs after the lint in the same script, so it is reached only when the lint passes. The JavaScript parse template beside it is project-added rather than carried, because payment declares no static-analysis tooling for the carried template to run |
 | `ci/templates/trivy-scan.yml` | Prior project | The two-pass order is the reason it is carried. Pass one always writes findings as an artifact and pass two applies the gate, so a blocked pipeline still leaves triage evidence behind |
@@ -388,11 +388,11 @@ scope are byte-identical, and no upstream file in the scope is missing here. Ten
 are present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
 `image-provider`, and `cart`, and `services/frontend/eslint.config.mjs`. Those ten are
-project-added configuration with no upstream origin, so no modification notice applies to
-them. The flat ESLint
-configuration is project-added rather than a modification because ESLint 9 reads flat
-configuration only and upstream ships none; the upstream `.eslintrc` beside it is
-retained unmodified and still counts among the byte-identical files.
+project-added configuration with no upstream origin, so no modification notice applies
+to them. The flat ESLint configuration is project-added rather than a modification
+because ESLint 9 reads flat configuration only and upstream ships none; the upstream
+`.eslintrc` beside it is retained unmodified and still counts among the byte-identical
+files.
 
 Those figures describe that comparison and nothing wider. Files outside `services/`, `pb/`,
 and `LICENSE` are not part of it and are not classified by these counts.
