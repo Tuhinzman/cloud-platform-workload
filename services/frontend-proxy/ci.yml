@@ -46,6 +46,14 @@ frontend-proxy:scan-image:
   variables:
     <<: *frontend-proxy-vars
 
+# Envoy configuration and a template. There is no package manager and no manifest, so
+# the declaration is none and an empty result is the honest one rather than a blind one.
+frontend-proxy:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *frontend-proxy-vars
+    SOURCE_DEPENDENCIES: none
+
 frontend-proxy:health-test:
   extends: .image-health-template
   dependencies:
@@ -78,12 +86,16 @@ frontend-proxy:health-test:
 
 frontend-proxy:publish:
   extends: .ecr-publish-template
-  # The scan is a prerequisite, not an ordering preference. GitLab refuses to create a
-  # pipeline whose job needs one that is not in it, so a rule change that dropped the gate
-  # would fail the pipeline instead of producing a publishable image that nothing scanned.
+  # Both security gates are prerequisites, not ordering preferences. GitLab refuses to
+  # create a pipeline whose job needs one that is not in it, so a rule change that dropped
+  # either gate would fail the pipeline instead of producing a publishable image that
+  # nothing scanned. The image pass and the source pass cover different things and neither
+  # is evidence for the other, which is why both are named.
   needs:
     - job: frontend-proxy:build
     - job: frontend-proxy:scan-image
+      artifacts: false
+    - job: frontend-proxy:scan-source
       artifacts: false
   variables:
     <<: *frontend-proxy-vars
@@ -93,6 +105,8 @@ frontend-proxy:retain-evidence:
   extends: .evidence-retain-template
   needs:
     - job: frontend-proxy:scan-image
+    - job: frontend-proxy:scan-source
+      artifacts: false
     - job: frontend-proxy:publish
   variables:
     <<: *frontend-proxy-vars

@@ -88,3 +88,107 @@
         - "ci/templates/trivy-scan.yml"
         - "ci/templates/ecr-publish.yml"
         - "ci/templates/evidence-retain.yml"
+
+# The same scanner, pointed at the source tree instead of the image, because neither view
+# sees what the other does and ADR-0009 requires both. Measured on this fleet: checkout's
+# Go binary carries 73 resolvable components into its image SBOM and quote's vendor
+# directory carries 52, but cart's self-contained .NET publish carries none at all and
+# shipping's statically linked Rust binary carries none either. For those two the image
+# scan has no managed-dependency view to report, so an image gate alone cannot be the
+# dependency gate ADR-0009 asks for. The reverse also holds: the source pass cannot see
+# the operating-system layer the image pass gates. They are complementary, and one is
+# never evidence for the other.
+#
+# The pass runs with needs: [] so it starts with the pipeline rather than after the build.
+# A dependency finding does not need an image to exist, and failing before a twenty-minute
+# container build is the cheaper order.
+#
+# SOURCE_DEPENDENCIES is the coverage declaration and it is the reason this job is not
+# merely a second scanner invocation. Trivy reports nothing for a project whose dependency
+# set it cannot resolve, and nothing is indistinguishable from clean in the output: cart
+# without a NuGet lock file and quote without a Composer lock file both returned zero
+# findings while resolving zero packages, which would have read as a pass. So a service
+# that declares managed dependencies must produce at least one resolved package, and a job
+# that resolves none fails. frontend-proxy and image-provider declare none because they
+# genuinely have none - one is Envoy configuration and the other is an nginx image - and
+# that declaration is what keeps their honest zero distinguishable from a blind one.
+#
+# The package count is read with Trivy's own template output rather than jq or python,
+# so the assertion needs nothing the scanner image does not already ship.
+.trivy-source-scan-template:
+  stage: scan
+  needs: []
+  image:
+    name: aquasec/trivy:0.70.0@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
+    entrypoint: [""]
+  variables:
+    TRIVY_CACHE_DIR: .trivycache
+    TRIVY_NO_PROGRESS: "true"
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+    SOURCE_DEPENDENCIES: declared
+  cache:
+    key: trivy-db-0.70.0
+    paths:
+      - .trivycache/
+  before_script:
+    - mkdir -p .trivycache
+    - touch .trivy-combined-ignore.txt
+    - if [ -f "${SERVICE_PATH}/.trivyignore" ]; then cat "${SERVICE_PATH}/.trivyignore" >> .trivy-combined-ignore.txt; fi
+  script:
+    # Pass one, informational, mirroring the image scan's order: findings are written before
+    # anything can block, so a blocked pipeline still leaves triage evidence behind.
+    - |
+      trivy fs \
+        --scanners vuln \
+        --severity HIGH,CRITICAL \
+        --format json \
+        --output trivy-source-findings.json \
+        --list-all-pkgs \
+        --exit-code 0 \
+        "${SERVICE_PATH}"
+    - |
+      resolved=$(trivy fs \
+        --scanners vuln \
+        --list-all-pkgs \
+        --format template \
+        --template '{{- range . }}{{- range .Packages }}x{{ end }}{{- end }}' \
+        --exit-code 0 \
+        "${SERVICE_PATH}" | tr -cd 'x' | wc -c | tr -d ' ')
+      printf '%s\n' "${resolved}" > source-packages-resolved.txt
+      echo "resolved ${resolved} packages, SOURCE_DEPENDENCIES=${SOURCE_DEPENDENCIES}"
+      if [ "${SOURCE_DEPENDENCIES}" = "declared" ] && [ "${resolved}" -eq 0 ]; then
+        echo "FAIL: ${SERVICE_NAME} declares managed dependencies and the scanner resolved none."
+        echo "A zero finding count here would be a blind spot, not a clean result."
+        echo "Add the ecosystem's lock file, or correct SOURCE_DEPENDENCIES if the declaration is wrong."
+        exit 1
+      fi
+    - printf '%s\n' "${CI_JOB_ID}" > source-scan-job-id.txt
+    - |
+      set +e
+      trivy fs \
+        --scanners vuln \
+        --severity HIGH,CRITICAL \
+        --ignore-unfixed \
+        --ignorefile .trivy-combined-ignore.txt \
+        --exit-code 1 \
+        "${SERVICE_PATH}"
+      gate_rc=$?
+      set -e
+      printf '%s\n' "${gate_rc}" > trivy-source-gate-rc.txt
+      exit "${gate_rc}"
+  artifacts:
+    paths:
+      - trivy-source-findings.json
+      - trivy-source-gate-rc.txt
+      - source-packages-resolved.txt
+      - source-scan-job-id.txt
+    expire_in: never
+    when: always
+  rules:
+    - changes:
+        - "${SERVICE_PATH}/**/*"
+        - "${SERVICE_SHARED_INPUTS}"
+        - "ci/templates/image.yml"
+        - "ci/templates/trivy-scan.yml"
+        - "ci/templates/ecr-publish.yml"
+        - "ci/templates/evidence-retain.yml"

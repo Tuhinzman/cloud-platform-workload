@@ -42,6 +42,14 @@ checkout:scan-image:
   variables:
     <<: *checkout-vars
 
+# checkout's Go binary does carry its module graph into the image SBOM, so this pass
+# overlaps rather than fills a hole. It stays because overlap is not redundancy: the
+# module graph in the binary is what the linker kept, and go.mod is what was declared.
+checkout:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *checkout-vars
+
 checkout:health-test:
   extends: .image-health-template
   dependencies:
@@ -60,12 +68,16 @@ checkout:health-test:
 
 checkout:publish:
   extends: .ecr-publish-template
-  # The scan is a prerequisite, not an ordering preference. GitLab refuses to create a
-  # pipeline whose job needs one that is not in it, so a rule change that dropped the gate
-  # would fail the pipeline instead of producing a publishable image that nothing scanned.
+  # Both security gates are prerequisites, not ordering preferences. GitLab refuses to
+  # create a pipeline whose job needs one that is not in it, so a rule change that dropped
+  # either gate would fail the pipeline instead of producing a publishable image that
+  # nothing scanned. The image pass and the source pass cover different things and neither
+  # is evidence for the other, which is why both are named.
   needs:
     - job: checkout:build
     - job: checkout:scan-image
+      artifacts: false
+    - job: checkout:scan-source
       artifacts: false
   variables:
     <<: *checkout-vars
@@ -75,6 +87,8 @@ checkout:retain-evidence:
   extends: .evidence-retain-template
   needs:
     - job: checkout:scan-image
+    - job: checkout:scan-source
+      artifacts: false
     - job: checkout:publish
   variables:
     <<: *checkout-vars

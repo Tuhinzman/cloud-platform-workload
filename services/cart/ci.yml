@@ -64,3 +64,11 @@ cart:scan-image:
     - cart:build
   variables:
     <<: *cart-vars
+
+# cart publishes as a single self-contained binary, so its image SBOM carries 19
+# components and not one of them is a managed dependency. This pass is the only
+# managed-dependency coverage cart has.
+cart:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *cart-vars

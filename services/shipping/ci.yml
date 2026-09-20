@@ -52,6 +52,14 @@ shipping:scan-image:
   variables:
     <<: *shipping-vars
 
+# shipping links its Rust dependencies statically, so its image SBOM carries 14
+# operating-system packages and no crate. This pass is the only managed-dependency
+# coverage shipping has.
+shipping:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *shipping-vars
+
 shipping:health-test:
   extends: .image-health-template
   dependencies:
@@ -64,12 +72,16 @@ shipping:health-test:
 
 shipping:publish:
   extends: .ecr-publish-template
-  # The scan is a prerequisite, not an ordering preference. GitLab refuses to create a
-  # pipeline whose job needs one that is not in it, so a rule change that dropped the gate
-  # would fail the pipeline instead of producing a publishable image that nothing scanned.
+  # Both security gates are prerequisites, not ordering preferences. GitLab refuses to
+  # create a pipeline whose job needs one that is not in it, so a rule change that dropped
+  # either gate would fail the pipeline instead of producing a publishable image that
+  # nothing scanned. The image pass and the source pass cover different things and neither
+  # is evidence for the other, which is why both are named.
   needs:
     - job: shipping:build
     - job: shipping:scan-image
+      artifacts: false
+    - job: shipping:scan-source
       artifacts: false
   variables:
     <<: *shipping-vars
@@ -79,6 +91,8 @@ shipping:retain-evidence:
   extends: .evidence-retain-template
   needs:
     - job: shipping:scan-image
+    - job: shipping:scan-source
+      artifacts: false
     - job: shipping:publish
   variables:
     <<: *shipping-vars

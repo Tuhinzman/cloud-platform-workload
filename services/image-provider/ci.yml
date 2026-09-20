@@ -41,6 +41,14 @@ image-provider:scan-image:
   variables:
     <<: *image-provider-vars
 
+# An nginx image with static assets. No package manager, no manifest, so the
+# declaration is none and an empty result is the honest one rather than a blind one.
+image-provider:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *image-provider-vars
+    SOURCE_DEPENDENCIES: none
+
 image-provider:health-test:
   extends: .image-health-template
   dependencies:
@@ -56,12 +64,16 @@ image-provider:health-test:
 
 image-provider:publish:
   extends: .ecr-publish-template
-  # The scan is a prerequisite, not an ordering preference. GitLab refuses to create a
-  # pipeline whose job needs one that is not in it, so a rule change that dropped the gate
-  # would fail the pipeline instead of producing a publishable image that nothing scanned.
+  # Both security gates are prerequisites, not ordering preferences. GitLab refuses to
+  # create a pipeline whose job needs one that is not in it, so a rule change that dropped
+  # either gate would fail the pipeline instead of producing a publishable image that
+  # nothing scanned. The image pass and the source pass cover different things and neither
+  # is evidence for the other, which is why both are named.
   needs:
     - job: image-provider:build
     - job: image-provider:scan-image
+      artifacts: false
+    - job: image-provider:scan-source
       artifacts: false
   variables:
     <<: *image-provider-vars
@@ -71,6 +83,8 @@ image-provider:retain-evidence:
   extends: .evidence-retain-template
   needs:
     - job: image-provider:scan-image
+    - job: image-provider:scan-source
+      artifacts: false
     - job: image-provider:publish
   variables:
     <<: *image-provider-vars

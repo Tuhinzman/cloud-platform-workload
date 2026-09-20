@@ -48,6 +48,14 @@ quote:scan-image:
   variables:
     <<: *quote-vars
 
+# quote's vendor directory reaches the image, so the image scan already sees its
+# Composer packages. This pass reads composer.lock instead, which is the resolution
+# the build was pinned to rather than the tree that happened to be produced.
+quote:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *quote-vars
+
 quote:health-test:
   extends: .image-health-template
   dependencies:
@@ -60,12 +68,16 @@ quote:health-test:
 
 quote:publish:
   extends: .ecr-publish-template
-  # The scan is a prerequisite, not an ordering preference. GitLab refuses to create a
-  # pipeline whose job needs one that is not in it, so a rule change that dropped the gate
-  # would fail the pipeline instead of producing a publishable image that nothing scanned.
+  # Both security gates are prerequisites, not ordering preferences. GitLab refuses to
+  # create a pipeline whose job needs one that is not in it, so a rule change that dropped
+  # either gate would fail the pipeline instead of producing a publishable image that
+  # nothing scanned. The image pass and the source pass cover different things and neither
+  # is evidence for the other, which is why both are named.
   needs:
     - job: quote:build
     - job: quote:scan-image
+      artifacts: false
+    - job: quote:scan-source
       artifacts: false
   variables:
     <<: *quote-vars
@@ -75,6 +87,8 @@ quote:retain-evidence:
   extends: .evidence-retain-template
   needs:
     - job: quote:scan-image
+    - job: quote:scan-source
+      artifacts: false
     - job: quote:publish
   variables:
     <<: *quote-vars

@@ -127,6 +127,40 @@ exception. It simply does not run.
 | llm | Not part of a justified application path |
 | react-native-app | Not part of a justified application path |
 
+## Dependency Scanning Coverage
+
+ADR-0009 asks one scanner to cover image *and* dependency scanning. Those are two views,
+and measurement on this fleet shows neither one contains the other, so the pipeline runs
+both and neither is recorded as evidence for the other.
+
+What the image scan sees depends on what the build leaves legible in the image, and that
+varies by language rather than by packaging. Measured at the current anchor:
+
+| Component | Tier | Managed deps in the image SBOM | Packages the source pass resolves |
+|---|---|---|---|
+| checkout | Go | 73, from the module graph inside the binary | 74, from `go.mod` |
+| quote | PHP | 52, from the vendor directory | 52, from `composer.lock` |
+| shipping | Rust | none: 14 OS packages only | 237, from `Cargo.lock` |
+| cart | .NET | none: 18 OS packages only | 41, from `packages.lock.json` |
+| frontend-proxy | Envoy config | no application dependencies exist | none, declared |
+| image-provider | nginx + assets | no application dependencies exist | none, declared |
+
+Two of the six carry no managed dependency into the image at all, so for those the source
+pass is the only dependency coverage there is. The reverse also holds: the source pass
+never sees the operating-system layer, which is what the image gate reads.
+
+`SOURCE_DEPENDENCIES` is why an empty result is readable. Trivy reports nothing for a
+project whose dependency set it cannot resolve, and nothing is indistinguishable from
+clean: before this control, cart and quote each resolved zero packages and reported zero
+findings. A service declaring managed dependencies must now resolve at least one package
+or its job fails, so a scanner blind spot blocks instead of passing quietly. Only
+frontend-proxy and image-provider declare `none`, and each genuinely has no package
+manager.
+
+The gate blocks on fixable HIGH and CRITICAL, the same threshold and the same
+`--ignore-unfixed` semantics the image gate uses. Findings without an available fix are
+reported and not hidden.
+
 ## Evidence Owed by Every Deployed Component
 
 Sixteen items. No component carries the full set: checkout, shipping and quote carry
