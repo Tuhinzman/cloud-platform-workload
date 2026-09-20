@@ -1,13 +1,17 @@
 # Declarative configuration for payment. Behaviour lives in ci/templates.
 #
-# IMAGE_REPO is deliberately absent. The platform registry exists, but payment has no
-# repository in it and no publish path, so the image jobs stay unwired rather than
-# pointing somewhere wrong.
+# There is no publish or evidence job. Those stages need an ECR repository for payment, and
+# none exists or is authorized. Publication is opt-in per service, so omitting the job is
+# what keeps payment inside the locally executable chain; nothing here is blocked on the
+# pipeline.
 
 .payment-vars: &payment-vars
   SERVICE_NAME: payment
   SERVICE_PATH: services/payment
   LANG_TIER: node
+  # payment COPYs pb/demo.proto into its image and loads it at startup, so a change to the
+  # shared contract changes what payment builds and what it serves.
+  SERVICE_SHARED_INPUTS: pb/**/*
 
 payment:lint-dockerfile:
   extends: .hadolint-template
@@ -22,3 +26,36 @@ payment:lint-node:
   extends: .lang-node-parse-template
   variables:
     <<: *payment-vars
+
+payment:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *payment-vars
+
+payment:build:
+  extends: .image-build-template
+  variables:
+    <<: *payment-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+payment:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - payment:build
+  variables:
+    <<: *payment-vars
+
+# payment binds its gRPC port before anything external is needed: index.js registers the
+# health service and the PaymentService, then calls bindAsync. The flagd dependency lives
+# inside the Charge handler, so it is reached per request and not at startup, which is why
+# the shared health template's semantics are honest here without a dependency container.
+payment:health-test:
+  extends: .image-health-template
+  dependencies:
+    - payment:build
+  variables:
+    <<: *payment-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e PAYMENT_PORT=8080

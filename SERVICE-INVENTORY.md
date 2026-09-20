@@ -12,7 +12,12 @@ bundle the pipeline retained itself, shipping first and then image-provider. fro
 is wired for build, scan, SBOM and container health and has published nothing. cart has
 executed build, scan and SBOM on a pipeline that passed, has no container health job,
 and has published nothing: no registry repository, no digest, no promotion, no runtime.
-Evidence for the remaining eleven components is unpopulated until the corresponding
+payment carries build, both security gates, SBOM and container health, and has published
+nothing for the same reason cart has not. Its container health is a real result rather
+than an exception: it binds its gRPC port before anything external is needed. What that
+does not cover is recorded with it - the Charge handler reaches flagd per request, so the
+application path beyond the health service is not validated in CI.
+Evidence for the remaining ten components is unpopulated until the corresponding
 implementation and validation have actually occurred. Wiring is not execution,
 publication is not runtime evidence, and none of this is fleet-wide delivery: eight
 components have no pipeline configuration at all. Identity and classification are facts
@@ -142,11 +147,15 @@ varies by language rather than by packaging. Measured at the current anchor:
 | quote | PHP | 52, from the vendor directory | 52, from `composer.lock` |
 | shipping | Rust | none: 14 OS packages only | 237, from `Cargo.lock` |
 | cart | .NET | none: 18 OS packages only | 41, from `packages.lock.json` |
+| payment | Node | 314, from the installed `node_modules` tree | 254, from `package-lock.json` |
 | frontend-proxy | Envoy config | no application dependencies exist | none, declared |
 | image-provider | nginx + assets | no application dependencies exist | none, declared |
 
-Two of the six carry no managed dependency into the image at all, so for those the source
-pass is the only dependency coverage there is. The reverse also holds: the source pass
+Two of the seven carry no managed dependency into the image at all, so for those the
+source pass is the only dependency coverage there is. payment is the opposite case: its
+image carries more component records than the lock file resolves, because the scanner
+reads the installed tree while the source pass reads the declared one. The counts are not
+expected to match and neither number is the other's check. The reverse also holds: the source pass
 never sees the operating-system layer, which is what the image gate reads.
 
 `SOURCE_DEPENDENCIES` is why an empty result is readable. Trivy reports nothing for a
@@ -166,8 +175,9 @@ reported and not hidden.
 Sixteen items. No component carries the full set: checkout, shipping and quote carry
 most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
 items but none of the runtime ones, frontend-proxy carries its pipeline configuration
-alone, cart carries its pipeline configuration and an executed build, scan and SBOM with
-no publication or runtime behind them, and the remaining eleven components carry none.
+alone, cart and payment each carry their pipeline configuration and an executed build,
+both security gates and an SBOM with no publication or runtime behind them, and the
+remaining ten components carry none.
 Upstream or external image origin, classification, modification record, container
 definition or image source, reusable pipeline configuration where project-built, build
 result where project-built, current scan result, SBOM where project-built, registry digest,

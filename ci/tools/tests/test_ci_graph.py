@@ -435,8 +435,13 @@ class LockBuildBinding(unittest.TestCase):
                 declaring.add(svc)
         for svc in sorted(declaring):
             with self.subTest(service=svc):
-                manifests = glob.glob(os.path.join(ROOT, "services", svc, "**", "*.lock*"), recursive=True)
-                manifests += glob.glob(os.path.join(ROOT, "services", svc, "**", "go.sum"), recursive=True)
-                manifests += glob.glob(os.path.join(ROOT, "services", svc, "**", "packages.lock.json"), recursive=True)
-                self.assertTrue([m for m in manifests if "node_modules" not in m and "/vendor/" not in m],
-                                f"{svc} declares managed dependencies but commits no lock file")
+                # One name per ecosystem the fleet actually uses. npm's file is
+                # package-lock.json, which a *.lock* pattern does not match, and this test
+                # failed on payment for exactly that reason the first time a Node service
+                # declared dependencies.
+                names = ("package-lock.json", "packages.lock.json", "composer.lock",
+                         "Cargo.lock", "go.sum", "poetry.lock", "Gemfile.lock", "mix.lock")
+                found = [m for name in names
+                         for m in glob.glob(os.path.join(ROOT, "services", svc, "**", name), recursive=True)
+                         if "node_modules" not in m and "/vendor/" not in m]
+                self.assertTrue(found, f"{svc} declares managed dependencies but commits no lock file")
