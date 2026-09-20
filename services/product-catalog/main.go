@@ -285,7 +285,7 @@ func loadProductsFromDB(ctx context.Context) ([]*pb.Product, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query products: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	products, err := getProductsFromRows(ctx, rows)
 	if err != nil {
@@ -312,7 +312,7 @@ func searchProductsFromDB(ctx context.Context, query string) ([]*pb.Product, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to query products: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	products, err := getProductsFromRows(ctx, rows)
 	if err != nil {

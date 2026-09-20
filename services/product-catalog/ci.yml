@@ -32,8 +32,8 @@ product-catalog:scan-image:
   variables:
     <<: *product-catalog-vars
 
-# initDatabase is called per request, not from main, so the process listens without a
-# database. Only the port is proven here.
+# main() exits 1 unless DB_CONNECTION_STRING reaches a PostgreSQL that answers Ping,
+# so this job cannot pass without a datastore.
 product-catalog:health-test:
   extends: .image-health-template
   dependencies:
