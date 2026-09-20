@@ -3,6 +3,8 @@
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout.
+# Change: runtime base debian12 -> debian13. debian12 ships libssl3 with fixed HIGH/CRITICAL
+# CVEs and distroless has no package manager, so the base is the only place to clear them.
 
 FROM docker.io/library/node:22-slim AS builder
 
@@ -45,7 +47,7 @@ RUN npm ci --omit=dev
 
 # -----------------------------------------------------------------------------
 
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+FROM gcr.io/distroless/nodejs22-debian13:nonroot
 
 WORKDIR /app
 
