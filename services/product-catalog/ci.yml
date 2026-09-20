@@ -14,3 +14,32 @@ product-catalog:lint-go:
   extends: .lang-go-template
   variables:
     <<: *product-catalog-vars
+
+product-catalog:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *product-catalog-vars
+
+product-catalog:build:
+  extends: .image-build-template
+  variables:
+    <<: *product-catalog-vars
+
+product-catalog:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - product-catalog:build
+  variables:
+    <<: *product-catalog-vars
+
+# initDatabase is called per request, not from main, so the process listens without a
+# database. Only the port is proven here.
+product-catalog:health-test:
+  extends: .image-health-template
+  dependencies:
+    - product-catalog:build
+  variables:
+    <<: *product-catalog-vars
+    HEALTH_PORT: "8088"
+    HEALTH_ENV: >-
+      -e PRODUCT_CATALOG_PORT=8088

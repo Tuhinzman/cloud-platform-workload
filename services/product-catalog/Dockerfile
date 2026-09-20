@@ -6,7 +6,7 @@
 # Change: the build output is a file, so the stage copy no longer ends in a slash that
 # claims it is a directory. Current BuildKit tolerates the slash; other builders need not.
 
-FROM golang:1.24-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
 
 WORKDIR /usr/src/app/
 

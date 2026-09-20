@@ -12,14 +12,14 @@ bundle the pipeline retained itself, shipping first and then image-provider. fro
 is wired for build, scan, SBOM and container health and has published nothing. cart has
 executed build, scan and SBOM on a pipeline that passed, has no container health job,
 and has published nothing: no registry repository, no digest, no promotion, no runtime.
-payment and frontend each carry build, both security gates, SBOM and container health, and
-have published nothing for the same reason cart has not. frontend additionally returned
+payment, frontend and product-catalog each carry build, both security gates, SBOM and
+container health, and have published nothing for the same reason cart has not. frontend additionally returned
 HTTP 200 with rendered HTML and served the `/_next/` assets that page referenced; that is a
 bounded startup and static-asset result, not a check of any backend call it would make. Its container health is a real result rather
 than an exception: it binds its gRPC port before anything external is needed. What that
 does not cover is recorded with it - the Charge handler reaches flagd per request, so the
 application path beyond the health service is not validated in CI.
-Evidence for the remaining nine components is unpopulated until the corresponding
+Evidence for the remaining eight components is unpopulated until the corresponding
 implementation and validation have actually occurred. Wiring is not execution,
 publication is not runtime evidence, and none of this is fleet-wide delivery: eight
 components have no pipeline configuration at all. Identity and classification are facts
@@ -151,10 +151,11 @@ varies by language rather than by packaging. Measured at the current anchor:
 | cart | .NET | none: 18 OS packages only | 41, from `packages.lock.json` |
 | payment | Node | 314, from the installed `node_modules` tree | 254, from `package-lock.json` |
 | frontend | Node | 489, from the installed `node_modules` tree | 322, from `package-lock.json` |
+| product-catalog | Go | 57, from the module graph inside the binary | 58, from `go.mod` |
 | frontend-proxy | Envoy config | no application dependencies exist | none, declared |
 | image-provider | nginx + assets | no application dependencies exist | none, declared |
 
-Two of the eight carry no managed dependency into the image at all, so for those the
+Two of the nine carry no managed dependency into the image at all, so for those the
 source pass is the only dependency coverage there is. payment is the opposite case: its
 image carries more component records than the lock file resolves, because the scanner
 reads the installed tree while the source pass reads the declared one. The counts are not
@@ -178,9 +179,9 @@ reported and not hidden.
 Sixteen items. No component carries the full set: checkout, shipping and quote carry
 most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
 items but none of the runtime ones, frontend-proxy carries its pipeline configuration
-alone, cart, payment and frontend each carry their pipeline configuration and an executed
-build, both security gates and an SBOM with no publication or runtime behind them, and the
-remaining nine components carry none.
+alone, cart, payment, frontend and product-catalog each carry their pipeline configuration
+and an executed build, both security gates and an SBOM with no publication or runtime behind
+them, and the remaining eight components carry none.
 Upstream or external image origin, classification, modification record, container
 definition or image source, reusable pipeline configuration where project-built, build
 result where project-built, current scan result, SBOM where project-built, registry digest,
