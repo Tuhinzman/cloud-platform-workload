@@ -17,14 +17,24 @@
 # the Node tier checks formatting, so adding one here would apply a control to .NET that
 # the rest of the repository does not carry.
 #
-# Two reproducibility limitations, both recorded rather than hidden. First, no locked
-# restore: --locked-mode is the .NET equivalent of cargo --locked or npm ci and it requires
-# a packages.lock.json, which no service here commits, so restore resolves package versions
-# at job time. Second, the runtime identifier is inferred wherever a service sets
-# SelfContained without one: the SDK picks a target from the host it runs on, which in a
-# local check on two architectures produced linux-arm64 and linux-x64 from this same
-# script. Neither is an oversight, and together they are what this tier does not carry
-# that the Go, Node and Rust tiers do.
+# Restore is locked, which is what ties the dependency set the source gate scans to the one
+# the build resolves. Without it the gate reads packages.lock.json while restore is free to
+# resolve something else, and the scan would be evidence for an artifact nobody built.
+# --locked-mode is the .NET equivalent of cargo --locked or npm ci: if a project's metadata
+# and its lock file disagree, restore fails with NU1004 instead of quietly updating the
+# lock. A service that commits no lock file is unaffected, because locked mode is a
+# consistency check and not a requirement that one exist - measured, --locked-mode against
+# a project with no lock file exits 0 and writes nothing. That fail-open is covered
+# elsewhere rather than here: a service declaring managed dependencies whose lock file is
+# missing resolves zero packages and fails its source gate in the same pipeline.
+#
+# The remaining reproducibility limitation is the runtime identifier, and locking makes it
+# sharper rather than softer. cart sets SelfContained without a RID, so the SDK infers one
+# from the host, and the lock file records it: generated on linux-x64 it carries
+# net10.0/linux-x64, and a locked restore of that lock file on an arm64 host fails NU1004
+# because the inferred RID differs. The lock file is therefore architecture-bound to the
+# hosted runners it was generated for. That is a real bound and it is left visible on
+# purpose, because the failure is loud and correct rather than silent drift.
 #
 # Restore is its own step, and that placement decides what the project's NuGetAudit
 # settings do. A service's Directory.Build.props may set TreatWarningsAsErrors under
@@ -49,7 +59,7 @@
   script:
     - cd "${SERVICE_PATH}"
     - dotnet --version
-    - dotnet restore
+    - dotnet restore --locked-mode
     - dotnet build --no-restore -c Release
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-dotnet.yml"]

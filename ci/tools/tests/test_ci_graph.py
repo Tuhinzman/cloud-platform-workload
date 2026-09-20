@@ -371,3 +371,72 @@ class SourceDependencyGate(unittest.TestCase):
         errors = ci_graph.validate_needs(broken, jobs)
         self.assertTrue(errors, "a publish with no source gate must be reported invalid")
         self.assertTrue(any("scan-source" in e for e in errors), errors)
+
+
+class LockBuildBinding(unittest.TestCase):
+    """The source gate scans a lock file. These are the checks that keep the build from
+    resolving something else, which would make the scan evidence for an artifact nobody
+    built. Both mechanisms were measured against the real toolchains before being asserted
+    here: NU1004 for NuGet, a non-zero composer validate for Composer."""
+
+    LOCKFILES = {
+        "nuget": "packages.lock.json",
+        "composer": "composer.lock",
+    }
+
+    def committed_lockfiles(self, filename):
+        return {p.split(os.sep)[-3] if p.split(os.sep)[-2] == "src" else p.split(os.sep)[-2]
+                for p in glob.glob(os.path.join(ROOT, "services", "*", "**", filename), recursive=True)}
+
+    def tier_script(self, template_file, key):
+        return "\n".join(yaml.safe_load(open(os.path.join(ROOT, template_file)))[key]["script"])
+
+    def test_dotnet_tier_restores_in_locked_mode(self):
+        """A committed packages.lock.json that restore is free to ignore is decoration.
+        Measured: with --locked-mode a changed package version fails NU1004; without it,
+        restore rewrites the lock file and exits 0."""
+        script = self.tier_script("ci/templates/lang-dotnet.yml", ".lang-dotnet-template")
+        self.assertIn("dotnet restore --locked-mode", script)
+        self.assertNotIn("\n    - dotnet restore\n", "\n" + script + "\n")
+
+    def test_php_tier_does_not_disable_the_lock_check(self):
+        """composer validate checks manifest against lock by default. --no-check-lock was
+        correct while no lock file existed and would now disable the check the evidence
+        model depends on. Measured: composer install alone reports the same drift as a
+        Warning and exits 0 unless the edit also breaks a constraint."""
+        script = self.tier_script("ci/templates/lang-php.yml", ".lang-php-template")
+        self.assertIn("composer validate", script)
+        self.assertNotIn("--no-check-lock", script)
+
+    def test_a_committed_lockfile_has_a_tier_that_enforces_it(self):
+        """The pairing, stated once rather than per service: if a service commits an
+        ecosystem lock file, that ecosystem's shared tier must enforce it."""
+        enforced = {
+            "nuget": ("ci/templates/lang-dotnet.yml", ".lang-dotnet-template", "--locked-mode"),
+            "composer": ("ci/templates/lang-php.yml", ".lang-php-template", "composer validate"),
+        }
+        for ecosystem, filename in self.LOCKFILES.items():
+            services_with = self.committed_lockfiles(filename)
+            if not services_with:
+                continue
+            path, key, token = enforced[ecosystem]
+            with self.subTest(ecosystem=ecosystem, services=sorted(services_with)):
+                self.assertIn(token, self.tier_script(path, key))
+
+    def test_every_source_scanned_service_declaring_dependencies_commits_a_lock(self):
+        """--locked-mode does not require a lock file to exist: measured, against a project
+        with none it exits 0 and writes nothing. That fail-open is closed by the source
+        gate rather than here, so the two controls have to stay paired."""
+        scanned = {j.split(":")[0] for j in jobs_extending(SOURCE_SCAN_TEMPLATE)}
+        declaring = set()
+        for svc in scanned:
+            body = yaml.safe_load(open(os.path.join(ROOT, "services", svc, "ci.yml")))[f"{svc}:scan-source"]
+            if (body.get("variables") or {}).get("SOURCE_DEPENDENCIES", "declared") == "declared":
+                declaring.add(svc)
+        for svc in sorted(declaring):
+            with self.subTest(service=svc):
+                manifests = glob.glob(os.path.join(ROOT, "services", svc, "**", "*.lock*"), recursive=True)
+                manifests += glob.glob(os.path.join(ROOT, "services", svc, "**", "go.sum"), recursive=True)
+                manifests += glob.glob(os.path.join(ROOT, "services", svc, "**", "packages.lock.json"), recursive=True)
+                self.assertTrue([m for m in manifests if "node_modules" not in m and "/vendor/" not in m],
+                                f"{svc} declares managed dependencies but commits no lock file")

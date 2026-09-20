@@ -16,9 +16,18 @@
 # stage is what covers dependency risk. -n1 keeps one file per invocation, because php -l
 # reports only the first file it is given.
 #
-# composer validate checks the manifest the vendor stage installs from. --no-check-lock is
-# required rather than preferred: this service carries no committed lock file, so the
-# default lock check would fail on a condition this tier is not authorized to change.
+# composer validate checks the manifest the vendor stage installs from, and its lock check
+# is now the reason this line matters. The service commits composer.lock, the source gate
+# reads that lock file, and the vendor stage installs from it, so manifest and lock drifting
+# apart would mean scanning one dependency set and shipping another. --no-check-lock used to
+# be here because no lock file existed; keeping it now would disable exactly the check the
+# evidence model depends on.
+#
+# composer install is not a substitute, and that was measured on this pinned image rather
+# than assumed: against a manifest edited out of step with the lock, install reported the
+# drift as a Warning and only failed because that particular edit also broke a constraint.
+# validate reports it as a lock file error and exits non-zero on the drift itself.
+#
 # --no-check-publish drops the packagist-readiness rules, which do not apply to a service
 # that is never published as a library.
 
@@ -30,7 +39,7 @@
   script:
     - cd "${SERVICE_PATH}"
     - php -v
-    - composer validate --no-check-publish --no-check-lock
+    - composer validate --no-check-publish
     - find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-php.yml"]

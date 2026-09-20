@@ -5,6 +5,11 @@
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout.
 # Change: vulnerable Alpine runtime packages are pinned to measured fixed revisions so the
 # HIGH-severity OS findings reported by the image scan are removed without a broad upgrade.
+# Change: composer.lock is copied into the vendor stage. Upstream copies only composer.json,
+# which makes `composer install` resolve dependencies afresh on every build - measured, it
+# logs "No composer.lock file present. Updating dependencies to latest instead". The source
+# gate reads composer.lock, so without this the scanned dependency set and the installed one
+# were free to differ and the scan would be evidence for an artifact nobody built.
 
 FROM ghcr.io/mlocati/php-extension-installer:2.9.11 AS installer
 
@@ -13,6 +18,7 @@ FROM docker.io/library/composer:2.8.12 AS vendor
 WORKDIR /tmp/
 
 COPY ./services/quote/composer.json composer.json
+COPY ./services/quote/composer.lock composer.lock
 
 RUN composer install \
     --ignore-platform-reqs \
