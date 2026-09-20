@@ -1,8 +1,6 @@
 # Declarative configuration for frontend. Behaviour lives in ci/templates.
 #
-# IMAGE_REPO is deliberately absent. The platform registry exists, but frontend has no
-# repository in it and no publish path, so the image jobs stay unwired rather than
-# pointing somewhere wrong.
+# No publish or evidence job: frontend has no ECR repository and none is authorized.
 
 .frontend-vars: &frontend-vars
   SERVICE_NAME: frontend
@@ -18,3 +16,33 @@ frontend:lint-node:
   extends: .lang-node-template
   variables:
     <<: *frontend-vars
+
+frontend:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *frontend-vars
+
+frontend:build:
+  extends: .image-build-template
+  variables:
+    <<: *frontend-vars
+
+frontend:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - frontend:build
+  variables:
+    <<: *frontend-vars
+
+# Next.js standalone reads PORT and binds HOSTNAME; without HOSTNAME it listens on the
+# container hostname only and the port check cannot reach it.
+frontend:health-test:
+  extends: .image-health-template
+  dependencies:
+    - frontend:build
+  variables:
+    <<: *frontend-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e PORT=8080
+      -e HOSTNAME=0.0.0.0
