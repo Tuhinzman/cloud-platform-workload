@@ -445,3 +445,126 @@ class LockBuildBinding(unittest.TestCase):
                          for m in glob.glob(os.path.join(ROOT, "services", svc, "**", name), recursive=True)
                          if "node_modules" not in m and "/vendor/" not in m]
                 self.assertTrue(found, f"{svc} declares managed dependencies but commits no lock file")
+
+
+HEALTH_TEMPLATE = ".image-health-template"
+DEFERRED = "deferred-to-runtime"
+VALIDATED = "validated-in-ci"
+
+
+def health_jobs():
+    return jobs_extending(HEALTH_TEMPLATE)
+
+
+def health_mode(config, job):
+    return (ci_graph.resolve(config, job).get("variables") or {}).get("HEALTH_MODE")
+
+
+def mode_dispatch():
+    """The template's own first script step, so the controls below run what CI runs."""
+    config = ci_graph.load_config(ROOT)
+    return ci_graph.resolve(config, HEALTH_TEMPLATE)["script"][0]
+
+
+def run_dispatch(**env):
+    import subprocess
+    return subprocess.run(["sh", "-c", mode_dispatch()], capture_output=True, text=True,
+                          env={"PATH": os.environ["PATH"], **env})
+
+
+class DeferredHealth(unittest.TestCase):
+    """A service that cannot listen until a dependency exists must say so rather than
+    silently omit the stage. Recording the deferral is not a health result."""
+
+    def test_deferred_mode_requires_a_reason(self):
+        config = ci_graph.load_config(ROOT)
+        for job in sorted(health_jobs()):
+            if health_mode(config, job) != DEFERRED:
+                continue
+            with self.subTest(job=job):
+                reason = (ci_graph.resolve(config, job)["variables"] or {}).get("HEALTH_REASON", "")
+                self.assertTrue(reason.strip(), "deferred health must carry a measured reason")
+
+    def test_empty_reason_fails_the_job(self):
+        r = run_dispatch(HEALTH_MODE=DEFERRED, HEALTH_REASON="")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("requires HEALTH_REASON", r.stdout)
+
+    def test_unknown_mode_fails_the_job(self):
+        for mode in ("skipped", "passed", "true", ""):
+            with self.subTest(mode=mode):
+                r = run_dispatch(HEALTH_MODE=mode, HEALTH_REASON="anything")
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("unknown HEALTH_MODE", r.stdout)
+
+    def test_deferred_records_without_claiming_a_pass(self):
+        r = run_dispatch(HEALTH_MODE=DEFERRED, HEALTH_REASON="measured cause")
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("NOT VALIDATED IN CI: measured cause; runtime readiness required", r.stdout)
+        self.assertNotIn("PASS", r.stdout.upper().replace("NOT VALIDATED", ""))
+
+    def test_validated_mode_falls_through_to_the_real_probe(self):
+        """Default mode must reach the container checks rather than short-circuit."""
+        r = run_dispatch(HEALTH_MODE=VALIDATED)
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), "")
+
+    def test_every_health_job_resolves_to_a_known_mode(self):
+        config = ci_graph.load_config(ROOT)
+        for job in sorted(health_jobs()):
+            with self.subTest(job=job):
+                self.assertIn(health_mode(config, job), {VALIDATED, DEFERRED})
+
+    def test_the_deferred_set_is_the_measured_one_only(self):
+        """Deferring is a claim about a service, not a way past a failing probe."""
+        config = ci_graph.load_config(ROOT)
+        deferred = {j.split(":")[0] for j in health_jobs() if health_mode(config, j) == DEFERRED}
+        self.assertEqual(deferred, {"cart", "product-catalog"})
+
+    def test_deferred_services_still_declare_a_health_job(self):
+        for svc in ("cart", "product-catalog"):
+            with self.subTest(service=svc):
+                self.assertIn(f"{svc}:health-test", health_jobs())
+
+    def test_no_health_job_carries_allow_failure(self):
+        config = ci_graph.load_config(ROOT)
+        for job in sorted(health_jobs()):
+            with self.subTest(job=job):
+                self.assertNotIn("allow_failure", ci_graph.resolve(config, job))
+
+    def test_deferred_services_add_no_dependency_container(self):
+        """The dind daemon the template already provides is the only service allowed."""
+        config = ci_graph.load_config(ROOT)
+        dind = ci_graph.resolve(config, ".docker-dind")["services"]
+        for svc in ("cart", "product-catalog"):
+            with self.subTest(service=svc):
+                self.assertEqual(ci_graph.resolve(config, f"{svc}:health-test")["services"], dind)
+
+    def test_deferred_services_add_no_local_script(self):
+        config = ci_graph.load_config(ROOT)
+        template_script = ci_graph.resolve(config, HEALTH_TEMPLATE)["script"]
+        for svc in ("cart", "product-catalog"):
+            with self.subTest(service=svc):
+                body = yaml.safe_load(open(os.path.join(ROOT, "services", svc, "ci.yml")))
+                self.assertNotIn("script", body[f"{svc}:health-test"])
+                self.assertEqual(ci_graph.resolve(config, f"{svc}:health-test")["script"],
+                                 template_script)
+                self.assertEqual(glob.glob(os.path.join(ROOT, "services", svc, "**", "health*"),
+                                           recursive=True), [])
+
+    def test_the_inventory_does_not_report_deferred_health_as_validated(self):
+        text = open(os.path.join(ROOT, "SERVICE-INVENTORY.md")).read()
+        for svc in ("cart", "product-catalog"):
+            with self.subTest(service=svc):
+                self.assertRegex(text, rf"{svc}[^|]*\|[^|]*health: deferred to runtime")
+
+    def test_no_terminal_classification_mechanism_exists_to_assert_against(self):
+        """Enforcement owed: nothing here decides FULL-CHAIN-VALIDATED, so a deferred
+        component cannot yet be machine-blocked from it. Delete this when one lands and
+        assert the block instead."""
+        token = "FULL-CHAIN" + "-VALIDATED"
+        skip = (os.path.join("ci", "tools", "tests"), ".git" + os.sep)
+        hits = [p for p in glob.glob(os.path.join(ROOT, "**", "*"), recursive=True)
+                if os.path.isfile(p) and not any(s in p for s in skip)
+                and token in open(p, errors="ignore").read()]
+        self.assertEqual(hits, [])

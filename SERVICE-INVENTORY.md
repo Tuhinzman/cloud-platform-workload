@@ -10,10 +10,11 @@ image-provider has build, scan, SBOM and artifact-publication evidence; it has n
 evidence, because no runtime window has included it. Two publications carry a provenance
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
 is wired for build, scan, SBOM and container health and has published nothing. cart has
-executed build, scan and SBOM on a pipeline that passed, has no container health job,
-and has published nothing: no registry repository, no digest, no promotion, no runtime.
-payment, frontend and product-catalog each carry build, both security gates, SBOM and
-container health, and have published nothing for the same reason cart has not. frontend additionally returned
+executed build, scan and SBOM on a pipeline that passed, defers container health to
+runtime, and has published nothing: no registry repository, no digest, no promotion, no
+runtime. payment and frontend each carry build, both security gates, SBOM and container
+health; product-catalog carries all of those but defers container health to runtime. None
+of the four has published anything, for the same reason cart has not. frontend additionally returned
 HTTP 200 with rendered HTML and served the `/_next/` assets that page referenced; that is a
 bounded startup and static-asset result, not a check of any backend call it would make. Its container health is a real result rather
 than an exception: it binds its gRPC port before anything external is needed. What that
@@ -133,6 +134,19 @@ exception. It simply does not run.
 | Workload own collector | Telemetry reaches the platform gateway only |
 | llm | Not part of a justified application path |
 | react-native-app | Not part of a justified application path |
+
+## Container Health Disposition
+
+Seven of the nine wired components prove container health in CI. Two cannot: their
+process reaches its listening state only after a dependency exists, so CI records the
+measured reason instead. A deferred entry is not a pass and not runtime evidence; the
+readiness obligation stays open until a runtime window answers it.
+
+| Component | Container health |
+|---|---|
+| checkout, quote, shipping, frontend-proxy, image-provider, payment, frontend | validated in CI |
+| cart | health: deferred to runtime — `Program.cs:98` resolves ValkeyCartStore before `app.Run()`, so `ValkeyCartStore.cs:101` throws without a reachable Valkey |
+| product-catalog | health: deferred to runtime — `main()` calls `initDatabase()` before the listener and exits 1 without a reachable PostgreSQL |
 
 ## Dependency Scanning Coverage
 

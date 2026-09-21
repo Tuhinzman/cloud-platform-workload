@@ -4,21 +4,6 @@
 # rather than the conventional service root, which the image and hadolint templates already
 # resolve through this variable.
 #
-# There is no health job, and the omission is measured rather than an oversight. cart
-# requires VALKEY_ADDR at startup and resolves it eagerly: Program.cs:98 takes the store
-# out of the container before app.Run(), so ValkeyCartStore.Initialize() runs before
-# Kestrel listens. Pointed at an address that does not resolve, the process does not start
-# degraded - it throws ApplicationException "Wasn't able to connect to redis" from
-# EnsureRedisConnected() at cartstore/ValkeyCartStore.cs:101 and the container exits. The
-# shared health template proves that a container starts and accepts a connection on its
-# port, and it deliberately points services at addresses that do not resolve, so it cannot
-# express what cart needs. A dependency container could be attached to this job alone, so
-# the obstacle is not mechanical. It is that doing so would make cart the first component
-# whose health job starts its dependencies, which is a change to what the stage means
-# rather than a change to one service's configuration. That belongs to a decision about the
-# health model, so the stage is recorded as a measured exception and cart's readiness is
-# left to the runtime that actually has a cache.
-#
 # There is no publish or evidence job. Those stages need an ECR repository for cart, and no
 # repository exists or is authorized. Nothing here is blocked on the pipeline.
 
@@ -72,3 +57,13 @@ cart:scan-source:
   extends: .trivy-source-scan-template
   variables:
     <<: *cart-vars
+
+cart:health-test:
+  extends: .image-health-template
+  dependencies: []
+  variables:
+    <<: *cart-vars
+    HEALTH_MODE: deferred-to-runtime
+    HEALTH_REASON: >-
+      Program.cs:98 resolves ValkeyCartStore before app.Run(), so Initialize() throws at
+      ValkeyCartStore.cs:101 without a reachable Valkey and Kestrel never listens

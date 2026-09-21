@@ -79,12 +79,33 @@
 #
 # HEALTH_ENV is expanded unquoted so the service supplies its own required environment
 # without every service needing its own job.
+#
+# HEALTH_MODE=deferred-to-runtime is for a service that cannot reach its listening state
+# until a dependency exists. The job then records that measured reason and succeeds at
+# recording it; that is not a health pass and never substitutes for runtime readiness.
 .image-health-template:
   extends: .docker-dind
   stage: health-test
   variables:
     SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+    HEALTH_MODE: validated-in-ci
   script:
+    - |
+      case "${HEALTH_MODE}" in
+        validated-in-ci) ;;
+        deferred-to-runtime)
+          if [ -z "${HEALTH_REASON}" ]; then
+            echo "FAIL: HEALTH_MODE=deferred-to-runtime requires HEALTH_REASON"
+            exit 1
+          fi
+          echo "NOT VALIDATED IN CI: ${HEALTH_REASON}; runtime readiness required"
+          exit 0
+          ;;
+        *)
+          echo "FAIL: unknown HEALTH_MODE=${HEALTH_MODE}"
+          exit 1
+          ;;
+      esac
     - docker load -i image.tar
     - docker run -d --name "${SERVICE_NAME}-health" -p "${HEALTH_PORT}:${HEALTH_PORT}" ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
     - |
