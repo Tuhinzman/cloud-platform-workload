@@ -62,15 +62,18 @@ the tree.
 The pipeline now has shared templates for Go, Node, PHP, Rust and .NET, but validation
 coverage is not uniform across the fleet. Checkout has an executed and passing
 Dockerfile lint path. Shipping and quote have executed validated build, scan, SBOM, and
-container health paths. Frontend, payment, and product-catalog have executed pipelines
-that reach the lint stage only. frontend-proxy and image-provider are wired through the
+container health paths. Frontend, payment, and product-catalog are wired through build,
+image and source scans and a container health job, with no publication stage, and each
+has passed its merge-request pipeline; frontend and payment pass the health check.
+frontend-proxy and image-provider are wired through the
 same shared templates for build, scan, SBOM and container health; neither carries a
 language tier, because neither directory holds application source. cart is wired through
 the shared templates for Dockerfile lint, .NET lint, tests, build, scan and SBOM. Its
-three upstream tests all carry a skip, so that job asserts nothing today. It carries no
-container health job: it requires its cache at startup and exits when that address does
-not resolve, which the shared health template cannot express, and its `ci.yml` records
-that. The product-catalog Go lint job is now configured as blocking and its latest
+three upstream tests all carry a skip, so that job asserts nothing today. Its container
+health job, like product-catalog's, runs in a deferred mode: cart needs its cache at
+startup and product-catalog its database, so neither process can listen in CI, and a
+passing job records that deferral without validating health, which remains owed at
+runtime. The product-catalog Go lint job is now configured as blocking and its latest
 validated run reports no findings. payment declares no linter and no TypeScript, so it
 extends a Node parse check rather than a lint, which asserts only that every `.js` file
 in the service directory parses; that job is now configured as blocking and its first
