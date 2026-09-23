@@ -1,13 +1,5 @@
-# Declarative configuration for shipping. Behaviour lives in ci/templates.
-#
-# Only the repository name is written here: the account-bearing registry host arrives as a
-# masked project variable, because it identifies the AWS account.
-#
-# The health job sets only SHIPPING_PORT; src/main.rs:25 reads it with .expect() and
-# panics without it. QUOTE_ADDR is read only per /get-quote request
-# (src/shipping_service/quote.rs:43) and has a default, so it stays unset rather than
-# implying this job exercises the quote dependency. IPV6_ENABLED is optional
-# (src/main.rs:32); unset, the bind is 0.0.0.0, the address the health check connects to.
+# Declarative configuration for shipping; behaviour lives in ci/templates. Only the ECR
+# repository name is set here: the account-bearing registry host is a masked project variable.
 
 .shipping-vars: &shipping-vars
   SERVICE_NAME: shipping
@@ -24,9 +16,8 @@ shipping:lint-rust:
   variables:
     <<: *shipping-vars
 
-# shipping owns unit tests, so it opts into the test tier. They are pure functions over
-# quote formatting at src/shipping_service/quote.rs:99 and :114, plus the module at
-# src/shipping_service.rs:64. They require no network and no sibling service.
+# Unit tests cover pure quote formatting (src/shipping_service/quote.rs:99, :114) plus an
+# in-process handler test (src/shipping_service.rs:64); none needs network or a sibling service.
 shipping:test-rust:
   extends: .lang-rust-test-template
   variables:
@@ -46,14 +37,16 @@ shipping:scan-image:
   variables:
     <<: *shipping-vars
 
-# shipping links its Rust dependencies statically, so its image SBOM carries 14
-# operating-system packages and no crate. This pass is the only managed-dependency
-# coverage shipping has.
+# Rust links crates statically, so the image SBOM has none; this is shipping's only
+# managed-dependency scan.
 shipping:scan-source:
   extends: .trivy-source-scan-template
   variables:
     <<: *shipping-vars
 
+# Sets only SHIPPING_PORT (src/main.rs:25 panics without it). QUOTE_ADDR is read per /get-quote
+# request and has a default, so it stays unset: this job does not exercise quote. IPV6_ENABLED
+# is optional; unset, the bind is 0.0.0.0, which the check connects to.
 shipping:health-test:
   extends: .image-health-template
   dependencies:
@@ -66,9 +59,7 @@ shipping:health-test:
 
 shipping:publish:
   extends: .ecr-publish-template
-  # Both scan gates are mandatory needs, and neither is evidence for the other: GitLab
-  # refuses a pipeline missing either one instead of offering an unscanned publish.
-  # Rationale: ci/templates/ecr-publish.yml and ci/templates/trivy-scan.yml.
+  # Both scans are required needs: GitLab refuses a pipeline that would publish unscanned.
   needs:
     - job: shipping:build
     - job: shipping:scan-image

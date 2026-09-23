@@ -1,17 +1,7 @@
-# Declarative configuration for quote. Behaviour lives in ci/templates.
-#
-# Only the repository name is written here: the account-bearing registry host arrives as a
-# masked project variable, because it identifies the AWS account.
-#
-# No test job: quote has no require-dev section in composer.json, no test runner, test
-# configuration or test directory, so a test job would assert nothing. The lint tier's
-# parse check is the only automated evidence about its own source.
-#
-# The health job sets only QUOTE_PORT, which public/index.php:100 needs to build the listen
-# address. The only other variable app/, public/ and src/ read is IPV6_ENABLED
-# (public/index.php:93), which is optional; unset, the bind stays 0.0.0.0, the address the
-# health check connects to. quote calls no other service: its one route computes
-# arithmetically (app/routes.php:29-30), so no placeholder addresses are needed.
+# Declarative configuration for quote; behaviour lives in ci/templates. Only the ECR
+# repository name is set here: the account-bearing registry host is a masked project variable.
+# No test job: quote has no require-dev, test runner or tests, so the lint tier's parse check is
+# the only automated evidence about its own code.
 
 .quote-vars: &quote-vars
   SERVICE_NAME: quote
@@ -42,14 +32,14 @@ quote:scan-image:
   variables:
     <<: *quote-vars
 
-# quote's vendor directory reaches the image, so the image scan already sees its
-# Composer packages. This pass reads composer.lock instead, which is the resolution
-# the build was pinned to rather than the tree that happened to be produced.
+# The image scan sees vendor/; this pass reads composer.lock, the resolution the build pinned.
 quote:scan-source:
   extends: .trivy-source-scan-template
   variables:
     <<: *quote-vars
 
+# Sets only QUOTE_PORT (public/index.php:100). IPV6_ENABLED is optional and unset binds
+# 0.0.0.0; quote calls no other service, so no placeholder addresses are needed.
 quote:health-test:
   extends: .image-health-template
   dependencies:
@@ -62,9 +52,7 @@ quote:health-test:
 
 quote:publish:
   extends: .ecr-publish-template
-  # Both scan gates are mandatory needs, and neither is evidence for the other: GitLab
-  # refuses a pipeline missing either one instead of offering an unscanned publish.
-  # Rationale: ci/templates/ecr-publish.yml and ci/templates/trivy-scan.yml.
+  # Both scans are required needs: GitLab refuses a pipeline that would publish unscanned.
   needs:
     - job: quote:build
     - job: quote:scan-image

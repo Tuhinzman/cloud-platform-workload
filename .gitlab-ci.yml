@@ -1,29 +1,15 @@
-# Root pipeline. Services contribute declarative configuration only, and shared behaviour
-# lives in ci/templates. Service-local pipeline logic requires a written justification.
-#
-# Promotion is a change to the GitOps repository, so nothing fills that stage here, but it
-# stays downstream of evidence: a published digest is promotion-eligible only once its
-# durable provenance bundle exists.
-#
-# Secret detection is GitLab's own analyzer rather than the image scanner. It answers a
-# different question and is kept a separate control for that reason. Its stage is
-# overridden because this pipeline has no test stage.
-#
-# One pipeline per commit. Without workflow rules GitLab creates both a branch pipeline and
-# a merge request pipeline for the same push once a merge request is open, and the two
-# validate the same commit twice. Only the merge request pipeline compares changes against
-# the target branch; a branch pipeline on a new branch has no previous commit to compare
-# against, so every changes: rule evaluates to true and the whole fleet fans out. Branch
-# pipelines are therefore not created at all: a merge request is the unit of review here
-# and is opened by the push that creates the branch.
+# Services declare configuration only (service-local logic needs a written justification); the
+# promote stage stays empty because promotion is a GitOps change, made once evidence exists.
 
+# Only MR and main pipelines: the MR, opened by the push that creates the branch, is the unit
+# of review. Branch pipelines would duplicate it, and on a new branch every changes: rule
+# matches with no diff base, so the whole fleet fans out.
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-# GitLab's secret detection template runs in merge request pipelines only when this is set;
-# without it the job would have survived only on main once branch pipelines went away.
+# Secret detection runs in MR pipelines only when this is set.
 variables:
   AST_ENABLE_MR_PIPELINES: "true"
 
@@ -58,5 +44,6 @@ include:
   - local: services/image-provider/ci.yml
   - local: services/cart/ci.yml
 
+# GitLab's analyzer, a control separate from the image scanner; moved to lint (no test stage).
 secret_detection:
   stage: lint

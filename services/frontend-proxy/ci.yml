@@ -1,23 +1,6 @@
-# Declarative configuration for frontend-proxy. Behaviour lives in ci/templates.
-#
-# Only the repository name is written here: the account-bearing registry host arrives as a
-# masked project variable, because it identifies the AWS account.
-#
-# LANG_TIER none is a classification, not an omission. Besides this file, the directory
-# holds a Dockerfile, a README and envoy.tmpl.yaml: no application source to lint or test.
-#
-# The health job sets every variable the template substitutes, which is more than the other
-# services need and is not defensive padding. envsubst blanks an unset variable, and Envoy
-# validates the whole bootstrap before it serves: started with only the three listener
-# variables set, the container exits with SocketAddressValidationError.Address "value length
-# must be at least 1 characters". So a missing cluster variable is a startup failure, not a
-# degraded proxy.
-#
-# The cluster hosts do not resolve in CI. That is deliberate and matches what the health
-# template already documents: the clusters are STRICT_DNS and resolve in the background, so
-# the listener comes up without the rest of the fleet existing. What this job proves is
-# bounded to that - the process starts, stays up and accepts a connection on ENVOY_PORT. It
-# does not prove any route reaches an upstream.
+# Declarative configuration for frontend-proxy; behaviour lives in ci/templates. Only the ECR
+# repository name is set here: the account-bearing registry host is a masked project variable.
+# LANG_TIER none: no application source, only a Dockerfile, a README and envoy.tmpl.yaml.
 
 .frontend-proxy-vars: &frontend-proxy-vars
   SERVICE_NAME: frontend-proxy
@@ -43,14 +26,16 @@ frontend-proxy:scan-image:
   variables:
     <<: *frontend-proxy-vars
 
-# Envoy configuration and a template. There is no package manager and no manifest, so
-# the declaration is none and an empty result is the honest one rather than a blind one.
+# Envoy configuration only: no manifest, so SOURCE_DEPENDENCIES is none.
 frontend-proxy:scan-source:
   extends: .trivy-source-scan-template
   variables:
     <<: *frontend-proxy-vars
     SOURCE_DEPENDENCIES: none
 
+# Sets every variable envoy.tmpl.yaml substitutes: envsubst blanks an unset one, and a blank
+# address fails bootstrap validation (SocketAddressValidationError). Cluster hosts are STRICT_DNS
+# and need not resolve, so this proves the listener starts, not that a route reaches an upstream.
 frontend-proxy:health-test:
   extends: .image-health-template
   dependencies:
@@ -83,9 +68,7 @@ frontend-proxy:health-test:
 
 frontend-proxy:publish:
   extends: .ecr-publish-template
-  # Both scan gates are mandatory needs, and neither is evidence for the other: GitLab
-  # refuses a pipeline missing either one instead of offering an unscanned publish.
-  # Rationale: ci/templates/ecr-publish.yml and ci/templates/trivy-scan.yml.
+  # Both scans are required needs: GitLab refuses a pipeline that would publish unscanned.
   needs:
     - job: frontend-proxy:build
     - job: frontend-proxy:scan-image

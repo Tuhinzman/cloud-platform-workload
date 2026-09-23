@@ -1,9 +1,6 @@
-# The toolchain image matches the service Dockerfile's builder stage, so a lint pass
-# predicts a build pass. The image's minimal rustup profile omits clippy, hence the explicit
-# add. No formatter gate: no other tier runs one.
-#
-# --locked refuses to update Cargo.lock, so a dependency cannot move between the lint job
-# and the image build.
+# The toolchain matches the Dockerfile's builder, so a lint pass predicts a build pass. The
+# image's minimal rustup profile omits clippy. --locked fails on a stale Cargo.lock, so the
+# unlocked image build resolves the same versions this job checked.
 
 .lang-rust-template:
   stage: lint

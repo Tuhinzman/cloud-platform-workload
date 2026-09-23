@@ -1,18 +1,6 @@
-# Declarative configuration for image-provider. Behaviour lives in ci/templates.
-#
-# Only the repository name is written here: the account-bearing registry host arrives as a
-# masked project variable, because it identifies the AWS account.
-#
-# LANG_TIER none is a classification, not an omission. Besides this file, the directory
-# holds a Dockerfile, nginx.conf.template and the static files it serves: no application
-# source to lint or test.
-#
-# The health job sets exactly the four variables the Dockerfile names in its envsubst call.
-# That list is the whole substitution set, so nothing else in nginx.conf.template can be
-# blanked. The resolver is a literal 127.0.0.11 in the template rather than a variable, so
-# it needs no value here, and the OTEL exporter endpoint is resolved when a span is
-# exported rather than when the config is parsed, so an absent collector does not stop
-# nginx from starting.
+# Declarative configuration for image-provider; behaviour lives in ci/templates. Only the ECR
+# repository name is set here: the account-bearing registry host is a masked project variable.
+# LANG_TIER none: no application source, only a Dockerfile, nginx.conf.template and static files.
 
 .image-provider-vars: &image-provider-vars
   SERVICE_NAME: image-provider
@@ -38,14 +26,15 @@ image-provider:scan-image:
   variables:
     <<: *image-provider-vars
 
-# An nginx image with static assets. No package manager, no manifest, so the
-# declaration is none and an empty result is the honest one rather than a blind one.
+# An nginx image with static assets: no manifest, so SOURCE_DEPENDENCIES is none.
 image-provider:scan-source:
   extends: .trivy-source-scan-template
   variables:
     <<: *image-provider-vars
     SOURCE_DEPENDENCIES: none
 
+# Sets exactly the four variables the Dockerfile's envsubst names. The resolver is a literal in
+# the template and the OTEL endpoint resolves only at export, so nginx starts without a collector.
 image-provider:health-test:
   extends: .image-health-template
   dependencies:
@@ -61,9 +50,7 @@ image-provider:health-test:
 
 image-provider:publish:
   extends: .ecr-publish-template
-  # Both scan gates are mandatory needs, and neither is evidence for the other: GitLab
-  # refuses a pipeline missing either one instead of offering an unscanned publish.
-  # Rationale: ci/templates/ecr-publish.yml and ci/templates/trivy-scan.yml.
+  # Both scans are required needs: GitLab refuses a pipeline that would publish unscanned.
   needs:
     - job: image-provider:build
     - job: image-provider:scan-image

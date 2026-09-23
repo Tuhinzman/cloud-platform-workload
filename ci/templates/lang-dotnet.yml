@@ -1,31 +1,8 @@
-# The SDK image matches the service Dockerfile's builder stage, but this job does not
-# predict the image build: it runs a glibc build while the Dockerfile publishes
-# -r linux-musl-$TARGETARCH, so the restore graphs differ. This job gates source and
-# analyzers; only the image build checks the musl target.
-#
-# -c Release because the services enable AnalysisMode and TreatWarningsAsErrors only under
-# Release in their Directory.Build.props; a Debug build would gate nothing.
-#
-# No separate linter or formatter gate: the SDK's Roslyn analyzers are the linter, and no
-# other tier runs a formatter check.
-#
-# --locked-mode fails restore with NU1004 when a project and its packages.lock.json
-# disagree, instead of updating the lock, so the set the source gate scans is the set this
-# job builds. It is a consistency check, not a requirement: measured, with no lock file it
-# exits 0 and writes nothing. The source gate in trivy-scan.yml catches that case by
-# failing a service that declares managed dependencies and resolves zero packages.
-#
-# Known limitation, kept visible: cart sets SelfContained without a RID, so its lock file
-# records the host RID (net10.0/linux-x64) and a locked restore on an arm64 host fails
-# NU1004. The lock file is bound to the x64 hosted runners; the failure is loud, not drift.
-#
-# Restore runs first, as in the service Dockerfiles, and without -c Release; the build then
-# uses --no-restore. Under TreatWarningsAsErrors a Release restore, including the implicit
-# one in `dotnet build -c Release`, turns a NuGetAudit advisory into an error (measured
-# locally on cart with a known high-severity advisory), a stricter gate than the image
-# build applies. Each service's NuGetAudit setting is left as-is and its findings print to
-# this job's log; whether an advisory should block is an open security-policy question.
-# The project or solution in SERVICE_PATH is discovered, not named.
+# The SDK image matches the Dockerfile's builder, but this is a glibc build while the image
+# publishes for linux-musl: this job gates source and analyzers, and only the image build
+# checks musl. The SDK's Roslyn analyzers are the linter; there is no formatter gate.
+# Known limit: cart sets SelfContained without a RID, so its lock records linux-x64 and an arm64
+# host fails NU1004. The lock is bound to the x64 runners; that error is not drift.
 
 .lang-dotnet-template:
   stage: lint
@@ -35,7 +12,13 @@
   script:
     - cd "${SERVICE_PATH}"
     - dotnet --version
+    # --locked-mode fails with NU1004 on drift, so the lock the source gate scans is what this
+    # job builds (the image's musl restore is unlocked). With no lock file it passes; the source
+    # gate's zero-package check catches that.
     - dotnet restore --locked-mode
+    # Release, where the analyzers gate. --no-restore: under TreatWarningsAsErrors any Release
+    # restore turns NuGetAudit advisories into errors. They are logged, not gated, here; whether
+    # they should block is an open decision.
     - dotnet build --no-restore -c Release
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-dotnet.yml"]
@@ -43,9 +26,7 @@
 # Separate from the lint template so a service opts in only where tests actually exist.
 # Extending it from a service with no test files would report a passing test job that
 # asserted nothing.
-#
-# No -c Release: a Release restore would fail on the audit advisories above and report a
-# dependency finding instead of a test result.
+# No -c Release, so audit advisories cannot fail a test job.
 .lang-dotnet-test-template:
   stage: lint
   variables:

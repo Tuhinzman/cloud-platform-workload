@@ -1,15 +1,5 @@
-# The Composer image the service Dockerfile's vendor stage already pins, so no new image is
-# trusted; it carries both PHP and Composer. No linter, analyser or test runner: the service
-# declares no require-dev, and a tool installed here would be a control it does not own.
-#
-# php -l is the interpreter's parse step; -n1 because it checks only the first file given.
-# vendor/ is third-party code, covered by the scan stage rather than gated here.
-#
-# Keep composer validate's lock check (no --no-check-lock): the source gate scans
-# composer.lock and the vendor stage installs from it, so manifest/lock drift would mean
-# scanning one set and shipping another. validate exits non-zero on that drift; composer
-# install, measured on this pinned image, only warns. --no-check-publish skips packagist
-# rules that do not apply to an unpublished service.
+# The Composer image the vendor stage already pins, so no new image is trusted. No linter or
+# test runner: the service declares no require-dev to provide one.
 
 .lang-php-template:
   stage: lint
@@ -19,7 +9,11 @@
   script:
     - cd "${SERVICE_PATH}"
     - php -v
+    # Lock check kept: the scan and the vendor stage both read composer.lock and composer install
+    # only warns on drift, so this stops composer.json declaring a set nobody scanned or shipped.
+    # --no-check-publish: the service is not a published package.
     - composer validate --no-check-publish
+    # -n1 runs one php -l invocation per file; vendor/ is left to dependency scanning.
     - find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-php.yml"]

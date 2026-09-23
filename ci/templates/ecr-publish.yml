@@ -1,34 +1,12 @@
-# Publication to the platform registry.
-#
-# The job holds no AWS credential. It requests a GitLab ID token, exchanges it for
-# short-lived STS credentials, and those expire on their own. The audience is
-# sts.amazonaws.com because the applied AWS trust policy pins that exact value.
-#
-# No environment: keyword here, and that is not a style choice. A job declaring an
-# environment gets extra fields in its OIDC sub claim, and the trust policy matches the
-# sub string exactly, so the assumption would fail.
-#
-# The account-bearing registry host and the role ARN arrive as masked project variables.
-# Neither belongs in this repository. Only the repository name is written here.
-#
-# Manual on purpose. Enabling CI/CD must not publish anything by itself, and the first
-# digest is a separately authorized step.
-#
-# Publication is gated twice, and only the second gate is structural. The rule carries the
-# same changes list as the other three artifact-chain templates, so this job exists only where
-# the service is also built and scanned. A shared list is a convention that can drift into a
-# pipeline offering publish with no scan, so each service's publish job also needs its scans:
-# GitLab refuses to create a pipeline whose job needs one that is absent.
-#
-# The raw registry manifest is retained because the published digest is the SHA-256 of
-# exactly those bytes, so a later reader recomputes it rather than trusting this job; an
-# earlier binding without them could only be recorded as derived. The evidence stage does
-# the verifying, keeping a fetch problem distinct from an integrity problem.
-# batch-get-image uses the ecr:BatchGetImage this role holds for publication read-back.
+# Publishes the scanned image.tar. Only the repository name is set per service; the registry
+# host and role ARN are masked project variables because they identify the account.
 
 .ecr-publish-template:
   extends: .docker-dind
   stage: publish
+  # No stored AWS credential: the ID token is exchanged for short-lived STS credentials, and
+  # aud must equal the value the trust policy pins. Never add environment: here; it changes
+  # the OIDC sub claim, which the trust policy matches exactly.
   id_tokens:
     AWS_ID_TOKEN:
       aud: sts.amazonaws.com
@@ -53,19 +31,13 @@
     - docker tag "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}"
     - aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
     - docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}"
-    # RepoDigests carries what the registry returned for the push, so this is the
-    # registry's digest and not one computed here. Only the digest is written out,
-    # because the full reference carries the account.
+    # The registry's own digest from the push. Only the digest is written, since the full
+    # reference carries the account.
     - docker inspect --format='{{index .RepoDigests 0}}' "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}" | cut -d@ -f2 > digest.txt
     - cat digest.txt
-    # Command substitution drops the trailing newline the CLI adds; the manifest bytes must
-    # be byte-exact or their hash is not the published digest.
-    #
-    # A digest that is not in the repository is not a CLI error: it comes back under
-    # failures, and the queries below then print the literal None. Asking the registry which
-    # digest it actually returned, and requiring it to equal the one just pushed, is what
-    # separates a real manifest from a miss. A non-empty check does not, because None is
-    # four bytes.
+    # Keep the manifest bytes exact (command substitution drops the CLI's newline) so their
+    # SHA-256 is the digest; the evidence stage verifies it. A missing digest returns None,
+    # not an error, so the returned digest must equal the pushed one.
     - |
       published=$(cat digest.txt)
       fetch() {
@@ -96,6 +68,9 @@
       - published-at.txt
       - publish-job-id.txt
     expire_in: never
+  # Manual on purpose: enabling CI must never publish by itself. The changes list mirrors the
+  # other artifact-chain templates, and each service's publish job also needs its scans, so
+  # GitLab refuses a pipeline that could publish an unscanned image.
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:

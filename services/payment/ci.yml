@@ -1,9 +1,5 @@
-# Declarative configuration for payment. Behaviour lives in ci/templates.
-#
-# There is no publish or evidence job. Those stages need an ECR repository for payment, and
-# none exists or is authorized. Publication is opt-in per service, so omitting the job is
-# what keeps payment inside the locally executable chain; nothing here is blocked on the
-# pipeline.
+# Declarative configuration for payment; behaviour lives in ci/templates. No publish or
+# evidence job: payment has no ECR repository and none is authorized.
 
 .payment-vars: &payment-vars
   SERVICE_NAME: payment
@@ -18,10 +14,8 @@ payment:lint-dockerfile:
   variables:
     <<: *payment-vars
 
-# payment is plain JavaScript and declares no linter, so it extends the parse template
-# rather than the lint and type-check one. What a passing result asserts is narrow: every
-# .js file in the service directory parses. It says nothing about undefined identifiers,
-# unused bindings, or anything else a linter reports.
+# Plain JavaScript with no linter, so it extends the parse check, which asserts only that
+# every .js file parses: nothing a linter would report.
 payment:lint-node:
   extends: .lang-node-parse-template
   variables:
@@ -46,10 +40,8 @@ payment:scan-image:
   variables:
     <<: *payment-vars
 
-# payment binds its gRPC port before anything external is needed: index.js registers the
-# health service and the PaymentService, then calls bindAsync. The flagd dependency lives
-# inside the Charge handler, so it is reached per request and not at startup, which is why
-# the shared health template's semantics are honest here without a dependency container.
+# payment binds its port before needing anything external; flagd is reached only per Charge
+# request, so no dependency container is needed.
 payment:health-test:
   extends: .image-health-template
   dependencies:

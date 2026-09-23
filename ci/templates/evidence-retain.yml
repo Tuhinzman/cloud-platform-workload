@@ -1,39 +1,6 @@
-# Durable artifact provenance.
-#
-# The problem this solves is not confidentiality, it is durability. Job artifacts expire,
-# and when they do the raw scan and SBOM behind a published digest are gone: checkout's
-# are already unrecoverable, and shipping's and quote's had to be rescued by hand. A fleet
-# publishes more artifacts, not fewer, so the mechanism has to be structural.
-#
-# Where the bundle lives is measured, not preferred. It stays in job artifacts, which stop
-# expiring, rather than the more durable package registry, which on this public GitLab project
-# is readable by anyone and so unfit for raw vulnerability reports. Job artifacts are readable
-# only by project members because project-based pipeline visibility is off here.
-#
-# expire_in: never is the retention rule because the alternative cannot be expressed. The
-# invariant is that evidence for a digest still referenced by GitOps, or retained as
-# historical validation, must not be deleted; no time-based rule knows either fact. Removal
-# is therefore an explicit owner action, not a schedule. The bundles are kilobytes.
-#
-# Evidence identity is component + source commit + published digest, and the generator
-# refuses to overwrite one identity with different bytes, so a retried job either
-# reproduces the bundle exactly or fails.
-#
-# The job runs after a successful publish and is not optional. That is the promotion
-# contract: a published digest becomes eligible for GitOps promotion only once this job has
-# succeeded. If publication succeeds and this fails, the image exists in the registry but
-# the pipeline does not pass and the digest is PUBLISHED-BUT-NOT-PROMOTION-ELIGIBLE. Nothing
-# is deleted from the registry, because no cleanup policy here authorizes that.
-#
-# Each service reaches this job through needs rather than stage order, because publication
-# is authorized one service at a time. Under stage ordering the evidence stage waits for
-# every job in the publish stage, so one service's unplayed manual publish held back another
-# service's evidence and the contract above could never be satisfied. With needs, a service
-# waits only on its own scan and publish.
-#
-# The publish job must stay blocking, which is what rules:when:manual already gives it. An
-# optional manual job would not merely fail to block: a job needing one that is never played
-# is skipped rather than held, so the evidence would quietly not exist.
+# Job artifacts expire by default, taking the scan and SBOM behind a published digest with them,
+# so each publish gets a never-expiring bundle in job artifacts. Those are members-only because
+# project-based pipeline visibility is off; the package registry is world-readable here.
 
 .evidence-retain-template:
   stage: evidence
@@ -60,10 +27,8 @@
         --gate-rc-file trivy-gate-rc.txt \
         --publication-timestamp "$(cat published-at.txt)" \
         --out-dir evidence
-    # Covers the manifest as well as the raw files, so the whole bundle verifies with one
-    # command and the manifest does not vouch for itself. The file list is read from the
-    # bundle rather than named here, so a file the generator adds cannot be missed by a
-    # checksum file that still looks complete.
+    # Covers the manifest too, and lists files from the bundle itself, so a file the generator
+    # adds can never be missing from a checksum file that still looks complete.
     - |
       bundle="evidence/${SERVICE_NAME}/${CI_COMMIT_SHA}/$(cut -d: -f2 digest.txt)"
       cd "${bundle}"
@@ -73,8 +38,13 @@
   artifacts:
     paths:
       - evidence/
+    # No time-based rule knows which digests GitOps still references; removal is an owner action.
     expire_in: never
     when: on_success
+  # Promotion-eligible only after this succeeds; on failure the image stays in ECR, ineligible.
+  # Via needs, not stage order, so one unplayed publish cannot hold back another service.
+  # Publish stays blocking because rules: when: manual defaults allow_failure to false; an
+  # optional publish that is never played would silently skip this job.
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       changes:
@@ -85,10 +55,9 @@
         - "ci/templates/ecr-publish.yml"
         - "ci/templates/evidence-retain.yml"
 
-# Runs whenever the tools or their tests change, because a generator that is only exercised
-# at publication time is a generator nobody finds out is broken until the evidence matters.
-# The pattern ends in **/* rather than **: GitLab's matcher only spans directories for the
-# `**/` form, and a bare ** stopped this job from seeing its own tests directory.
+# Runs on every tool or CI config change, not only at publication: the graph tests prove
+# publish never appears without its scans. `**/*`, not `**`: GitLab's matcher only spans
+# directories in the `**/` form.
 evidence-tools:test:
   stage: lint
   image: python:3.13-alpine

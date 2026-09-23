@@ -1,30 +1,10 @@
-# Container image scanning in two passes, and the order is the point.
-#
-# Pass one never fails the job and always writes its findings as an artifact. Pass two
-# applies the gate. Running them in this order means a blocked pipeline still leaves
-# triage evidence behind, which a gate-only pipeline does not.
-#
-# The scanner image is pinned by digest so a tag move cannot change what ran. The database
-# cache key carries the scanner version, so a version bump invalidates the cache instead
-# of silently reusing an old database.
-#
-# The scan reads the tar the build stage saved rather than a registry tag. Scanning a
-# published image would mean publishing before the gate, which is the opposite of what
-# the gate exists for. The SBOM is written between the two passes, so it survives a
-# pipeline the gate blocks.
-#
-# Two things are captured that the reports themselves do not carry. The vulnerability
-# database metadata is read straight after the first pass, so it describes the database
-# that pass actually used, and reading it neither updates the database nor changes the
-# result. The blocking pass records its own exit status, so the gate result is observed
-# rather than derived from the findings.
-#
-# The evidence artifacts do not expire. What they support - the provenance of a published
-# digest - has no expiry either, and a 30 day window has already cost this project one
-# service's raw scan history.
+# Pass one reports without failing and pass two gates, so a blocked pipeline still leaves
+# findings; the SBOM is written in between for the same reason. The input is the build's tar,
+# never a registry image, so nothing is published before the gate.
 
 .trivy-scan-template:
   stage: scan
+  # Pinned by digest; the cache key carries the scanner version so an upgrade gets a fresh DB.
   image:
     name: aquasec/trivy:0.70.0@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
     entrypoint: [""]
@@ -48,6 +28,7 @@
         --output trivy-findings.json \
         --exit-code 0 \
         --input image.tar
+    # Read right after pass one, so it describes the database that pass used.
     - trivy version --format json > trivy-db-metadata.json || true
     - |
       trivy image \
@@ -55,7 +36,7 @@
         --output sbom.cdx.json \
         --input image.tar
     - printf '%s\n' "${CI_JOB_ID}" > scan-job-id.txt
-    # set +e only captures the gate's exit status; the job still exits with it.
+    # set +e only records the gate's own exit status as evidence; the job still exits with it.
     - |
       set +e
       trivy image \
@@ -75,7 +56,9 @@
       - trivy-db-metadata.json
       - trivy-gate-rc.txt
       - scan-job-id.txt
+      # Forwarded from the build: evidence jobs need the scan, not the build and its image.tar.
       - build-job-id.txt
+    # Never expires: it backs the provenance of a published digest.
     expire_in: never
     when: always
   rules:
@@ -87,27 +70,12 @@
         - "ci/templates/ecr-publish.yml"
         - "ci/templates/evidence-retain.yml"
 
-# The same scanner, pointed at the source tree instead of the image, because ADR-0009
-# requires both and neither is evidence for the other. cart's self-contained .NET publish
-# and shipping's statically linked Rust binary carry no managed dependency into the image
-# SBOM, so an image gate alone cannot be the dependency gate; the source pass in turn
-# cannot see the operating-system layer the image pass gates. SERVICE-INVENTORY.md records
-# the measured counts.
-#
-# The pass runs with needs: [] so it starts with the pipeline rather than after the build.
-# A dependency finding does not need an image to exist, and failing before a twenty-minute
-# container build is the cheaper order.
-#
-# SOURCE_DEPENDENCIES keeps a blind zero from reading as clean. Trivy reports nothing for a
-# dependency set it cannot resolve: cart without a NuGet lock file and quote without a
-# Composer lock file both returned zero findings from zero packages. A service declaring
-# managed dependencies must resolve at least one package or the job fails; frontend-proxy
-# (Envoy configuration) and image-provider (nginx) declare none because they have none.
-#
-# The package count is read with Trivy's own template output rather than jq or python,
-# so the assertion needs nothing the scanner image does not already ship.
+# Same scanner on the source tree: ADR-0009 requires both, and neither covers the other.
+# Statically linked or self-contained binaries (shipping, cart) carry no managed dependency
+# into the image SBOM, and this pass cannot see the OS layer.
 .trivy-source-scan-template:
   stage: scan
+  # Starts with the pipeline: a dependency finding does not need an image.
   needs: []
   image:
     name: aquasec/trivy:0.70.0@sha256:be1190afcb28352bfddc4ddeb71470835d16462af68d310f9f4bca710961a41e
@@ -116,6 +84,8 @@
     TRIVY_CACHE_DIR: .trivycache
     TRIVY_NO_PROGRESS: "true"
     SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+    # Trivy reports nothing for a dependency set it cannot resolve, which reads as clean, so a
+    # service with managed dependencies must resolve at least one; services with none set none.
     SOURCE_DEPENDENCIES: declared
   cache:
     key: trivy-db-0.70.0
@@ -126,8 +96,7 @@
     - touch .trivy-combined-ignore.txt
     - if [ -f "${SERVICE_PATH}/.trivyignore" ]; then cat "${SERVICE_PATH}/.trivyignore" >> .trivy-combined-ignore.txt; fi
   script:
-    # Pass one, informational, mirroring the image scan's order: findings are written before
-    # anything can block, so a blocked pipeline still leaves triage evidence behind.
+    # Informational pass first, as in the image scan, so a blocked run still leaves findings.
     - |
       trivy fs \
         --scanners vuln \
@@ -137,6 +106,7 @@
         --list-all-pkgs \
         --exit-code 0 \
         "${SERVICE_PATH}"
+    # Counted with Trivy's own template output: the scanner image ships no jq or python.
     - |
       resolved=$(trivy fs \
         --scanners vuln \

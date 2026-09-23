@@ -1,35 +1,12 @@
-# Image build and container start validation, both on GitLab.com hosted runners.
-#
-# Docker-in-Docker rather than a mounted host socket. A job holding the daemon socket
-# controls every container on that host, which is the pattern this project rejected, and
-# the dind service needs no runner of our own.
-#
-# The dind daemon runs with --mtu=1360, GitLab's hosted-runner network MTU since May 2026;
-# the inner daemon's bridge otherwise defaults to 1500, which the path cannot carry. Hosts
-# that honour path MTU discovery recover, but api.nuget.org behind Microsoft Front Door
-# filters the ICMP that discovery relies on, so a restore hangs to the job timeout. 1400
-# was tried first and still hung, since it is above 1360. GitLab also documents the
-# alternative FF_NETWORK_PER_BUILD; --mtu is used because it is one line in the one place
-# every build shares.
-#
-# The build stays local. Nothing reaches the registry before the scan gate has run, so
-# the image travels to the later stages as a saved tar artifact rather than a registry
-# tag, and a blocked pipeline publishes nothing.
-#
-# SERVICE_DOCKERFILE defaults to the conventional path and exists for the services that do
-# not follow it. cart keeps its container definition at services/cart/src/Dockerfile, where
-# upstream put it, and naming the file is cheaper than moving it and losing that lineage.
-#
-# BUILD_ARGS is expanded unquoted so a service can pass its own --build-arg pairs, the same
-# shape HEALTH_ENV already uses below. It is empty for every service today: the Java agent
-# version each Java service needs is a default inside its own Dockerfile, so a plain build
-# reproduces what CI builds. This exists so a version can be overridden without editing a
-# container definition.
+# Docker-in-Docker, not a mounted host socket: a job holding the host socket controls every
+# container on the runner.
 
 .docker-dind:
   image: docker:28-cli
   services:
     - name: docker:28-dind
+      # Matches GitLab's hosted-runner MTU. The inner bridge would use 1500, and api.nuget.org
+      # filters the ICMP path-MTU discovery needs, so restores hang; 1400 hangs as well.
       command: ["--mtu=1360"]
   variables:
     DOCKER_HOST: tcp://docker:2376
@@ -37,24 +14,25 @@
     DOCKER_TLS_VERIFY: "1"
     DOCKER_CERT_PATH: "/certs/client"
 
-# A twenty-minute ceiling, one third of GitLab's default. It is a cost bound, not the fix:
-# no healthy build here has needed a quarter of it, and a package source that never answers
-# would otherwise run to the hour, because NuGet's retry knob was measured not to end a
-# restore against a black-holed source inside fifteen minutes at any setting.
+# Builds locally and passes image.tar on, so nothing reaches the registry before the scan gate.
+# SERVICE_DOCKERFILE overrides the default path (cart keeps upstream's src/Dockerfile). BUILD_ARGS
+# (unquoted --build-arg pairs) stays empty: versions are Dockerfile ARG defaults, so a plain build
+# matches CI.
 .image-build-template:
   extends: .docker-dind
   stage: build
+  # A cost ceiling well above any healthy build, not a fix: NuGet retries cannot end a restore
+  # against an unresponsive source, so the job would otherwise run to the hour.
   timeout: 20m
   variables:
-    # A service that COPYs a shared directory into its image is not rebuilt by a change to
-    # that directory unless it says so, because the rule can only see ${SERVICE_PATH}. The
-    # default repeats a path the rule already carries, so declaring nothing changes nothing.
+    # Set by a service that COPYs a shared directory, since the rules only watch
+    # ${SERVICE_PATH}; the default adds nothing.
     SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
   script:
     - docker build ${BUILD_ARGS} -f "${SERVICE_DOCKERFILE:-${SERVICE_PATH}/Dockerfile}" -t "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" .
     - docker save -o image.tar "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
-    # GitLab tells a job only its own id, so the build records its own for the evidence
-    # bundle to pick up; the scan job forwards it rather than pulling image.tar again.
+    # A job only knows its own id, so the build records it; the scan forwards the file so the
+    # evidence job never depends on the build or its image.tar.
     - printf '%s\n' "${CI_JOB_ID}" > build-job-id.txt
   artifacts:
     paths:
@@ -70,17 +48,10 @@
         - "ci/templates/ecr-publish.yml"
         - "ci/templates/evidence-retain.yml"
 
-# What this proves is bounded: the image starts, stays up, and accepts a connection on
-# its port. It is not a functional test, and it deliberately points the service at
-# addresses that do not resolve, because the gRPC clients connect lazily and a first
-# digest must not require the rest of the fleet to exist.
-#
-# HEALTH_ENV is expanded unquoted so the service supplies its own required environment
-# without every service needing its own job.
-#
-# HEALTH_MODE=deferred-to-runtime is for a service that cannot reach its listening state
-# until a dependency exists. The job then records that measured reason and succeeds at
-# recording it; that is not a health pass and never substitutes for runtime readiness.
+# Proves only that the image starts, stays up and accepts a connection on its port. Dependency
+# addresses deliberately do not resolve so no other service is needed (gRPC connects lazily).
+# HEALTH_ENV is unquoted so each service supplies its own environment. deferred-to-runtime
+# records a measured reason and succeeds without validating health; runtime readiness is owed.
 .image-health-template:
   extends: .docker-dind
   stage: health-test

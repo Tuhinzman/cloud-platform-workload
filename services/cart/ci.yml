@@ -1,7 +1,5 @@
-# Declarative configuration for cart. Behaviour lives in ci/templates.
-#
-# There is no publish or evidence job. Those stages need an ECR repository for cart, and no
-# repository exists or is authorized. Nothing here is blocked on the pipeline.
+# Declarative configuration for cart; behaviour lives in ci/templates. No publish or evidence
+# job: cart has no ECR repository and none is authorized.
 
 .cart-vars: &cart-vars
   SERVICE_NAME: cart
@@ -22,10 +20,8 @@ cart:lint-dotnet:
   variables:
     <<: *cart-vars
 
-# cart ships a test project, so it opts into the test tier. All three tests in it carry
-# [Fact(Skip = ...)] upstream, so the job will discover three and assert none. It is wired
-# anyway because the skip is upstream state that can change, and an unwired tier would not
-# notice if it did.
+# All three upstream tests carry [Fact(Skip = ...)], so this asserts nothing today; it stays
+# wired so a change upstream is noticed.
 cart:test-dotnet:
   extends: .lang-dotnet-test-template
   variables:
@@ -45,9 +41,8 @@ cart:scan-image:
   variables:
     <<: *cart-vars
 
-# cart publishes as a single self-contained binary, so its image SBOM carries 19
-# components and not one of them is a managed dependency. This pass is the only
-# managed-dependency coverage cart has.
+# The self-contained binary carries no managed dependency into the image SBOM, so this is
+# cart's only managed-dependency scan.
 cart:scan-source:
   extends: .trivy-source-scan-template
   variables:

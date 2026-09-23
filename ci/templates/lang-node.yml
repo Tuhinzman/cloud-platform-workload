@@ -15,10 +15,9 @@
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-node.yml"]
 
-# For a service with no static-analysis tooling of its own; a linter added here would be a
-# control the service does not own. node --check parses without resolving require, so no
-# install is needed. -n1 because node --check checks only the first file it is given. The
-# list is written and tested rather than piped, so an empty one fails instead of passing.
+# For services without their own lint tooling. node --check parses without resolving require,
+# so nothing is installed; -n1 because it checks only its first argument. The list is written
+# to a file and tested, not piped, so an empty one fails instead of passing.
 
 .lang-node-parse-template:
   stage: lint
