@@ -1,9 +1,5 @@
 # Declarative configuration for cart. Behaviour lives in ci/templates.
 #
-# SERVICE_DOCKERFILE names the container definition because cart keeps it at src/Dockerfile
-# rather than the conventional service root, which the image and hadolint templates already
-# resolve through this variable.
-#
 # There is no publish or evidence job. Those stages need an ECR repository for cart, and no
 # repository exists or is authorized. Nothing here is blocked on the pipeline.
 
@@ -13,8 +9,7 @@
   LANG_TIER: dotnet
   SERVICE_DOCKERFILE: services/cart/src/Dockerfile
   # cart compiles pb/demo.proto into its gRPC stubs and COPYs pb/ into the image, so a
-  # change to the shared contract changes what cart builds. It is the only wired component
-  # with a build job that consumes it.
+  # change to the shared contract changes what cart builds.
   SERVICE_SHARED_INPUTS: pb/**/*
 
 cart:lint-dockerfile:

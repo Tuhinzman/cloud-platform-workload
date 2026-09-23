@@ -3,17 +3,11 @@
 # Only the repository name is written here: the account-bearing registry host arrives as a
 # masked project variable, because it identifies the AWS account.
 #
-# The health job sets SHIPPING_PORT and nothing else, and the omission is deliberate rather
-# than an oversight. src/main.rs:25 reads SHIPPING_PORT with .expect(), so the process
-# panics without it. QUOTE_ADDR is not set because it is never read at startup: it is read
-# inside request_quote() at src/shipping_service/quote.rs:43, which runs only on an inbound
-# /getquote request, and it already falls back to a default when unset. The health job
-# starts the container and checks the port, so it never reaches that path. Pointing
-# QUOTE_ADDR at an unused address would suggest this job exercises the quote dependency,
-# which it does not.
-#
-# IPV6_ENABLED is also unset. src/main.rs:32 treats it as optional and binds 0.0.0.0
-# without it, which is the address the health check connects to.
+# The health job sets only SHIPPING_PORT; src/main.rs:25 reads it with .expect() and
+# panics without it. QUOTE_ADDR is read only per /get-quote request
+# (src/shipping_service/quote.rs:43) and has a default, so it stays unset rather than
+# implying this job exercises the quote dependency. IPV6_ENABLED is optional
+# (src/main.rs:32); unset, the bind is 0.0.0.0, the address the health check connects to.
 
 .shipping-vars: &shipping-vars
   SERVICE_NAME: shipping
@@ -32,7 +26,7 @@ shipping:lint-rust:
 
 # shipping owns unit tests, so it opts into the test tier. They are pure functions over
 # quote formatting at src/shipping_service/quote.rs:99 and :114, plus the module at
-# src/shipping_service.rs:59. They require no network and no sibling service.
+# src/shipping_service.rs:64. They require no network and no sibling service.
 shipping:test-rust:
   extends: .lang-rust-test-template
   variables:
@@ -72,11 +66,9 @@ shipping:health-test:
 
 shipping:publish:
   extends: .ecr-publish-template
-  # Both security gates are prerequisites, not ordering preferences. GitLab refuses to
-  # create a pipeline whose job needs one that is not in it, so a rule change that dropped
-  # either gate would fail the pipeline instead of producing a publishable image that
-  # nothing scanned. The image pass and the source pass cover different things and neither
-  # is evidence for the other, which is why both are named.
+  # Both scan gates are mandatory needs, and neither is evidence for the other: GitLab
+  # refuses a pipeline missing either one instead of offering an unscanned publish.
+  # Rationale: ci/templates/ecr-publish.yml and ci/templates/trivy-scan.yml.
   needs:
     - job: shipping:build
     - job: shipping:scan-image

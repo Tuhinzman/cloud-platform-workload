@@ -3,11 +3,8 @@
 # Only the repository name is written here: the account-bearing registry host arrives as a
 # masked project variable, because it identifies the AWS account.
 #
-# There is no lint or test tier, and LANG_TIER records that as a classification rather than
-# leaving it to look like an omission. This service contains no application source: the
-# directory holds a Dockerfile, a README and envoy.tmpl.yaml. A language tier here would
-# extend a template with nothing to parse, lint or test. The Dockerfile lint and the image
-# scan are the automated evidence this component produces, and both are language-agnostic.
+# LANG_TIER none is a classification, not an omission. Besides this file, the directory
+# holds a Dockerfile, a README and envoy.tmpl.yaml: no application source to lint or test.
 #
 # The health job sets every variable the template substitutes, which is more than the other
 # services need and is not defensive padding. envsubst blanks an unset variable, and Envoy
@@ -86,11 +83,9 @@ frontend-proxy:health-test:
 
 frontend-proxy:publish:
   extends: .ecr-publish-template
-  # Both security gates are prerequisites, not ordering preferences. GitLab refuses to
-  # create a pipeline whose job needs one that is not in it, so a rule change that dropped
-  # either gate would fail the pipeline instead of producing a publishable image that
-  # nothing scanned. The image pass and the source pass cover different things and neither
-  # is evidence for the other, which is why both are named.
+  # Both scan gates are mandatory needs, and neither is evidence for the other: GitLab
+  # refuses a pipeline missing either one instead of offering an unscanned publish.
+  # Rationale: ci/templates/ecr-publish.yml and ci/templates/trivy-scan.yml.
   needs:
     - job: frontend-proxy:build
     - job: frontend-proxy:scan-image

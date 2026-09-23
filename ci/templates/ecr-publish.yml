@@ -15,21 +15,16 @@
 # digest is a separately authorized step.
 #
 # Publication is gated twice, and only the second gate is structural. The rule carries the
-# same changes list as the other three artifact-chain templates, so this job exists only in
-# pipelines that also build and scan the service; without it a docs-only commit created a
-# blocking manual job with no image.tar behind it. But a shared list is a convention, and
-# these four lists had already drifted apart once, leaving a reachable pipeline that
-# offered publish with no scan in it. So each service's publish job also names its scan as
-# a mandatory need. GitLab refuses to create a pipeline whose job needs one that is absent,
-# which turns that drift from a silent hole into a pipeline that does not start.
+# same changes list as the other three artifact-chain templates, so this job exists only where
+# the service is also built and scanned. A shared list is a convention that can drift into a
+# pipeline offering publish with no scan, so each service's publish job also needs its scans:
+# GitLab refuses to create a pipeline whose job needs one that is absent.
 #
 # The raw registry manifest is retained because the published digest is the SHA-256 of
-# exactly those bytes. Keeping them is what lets a later reader recompute the digest
-# instead of trusting a number this job printed, and it is the hop that was missing when
-# an earlier artifact's binding had to be recorded as derived rather than direct. Only the
-# retrieval happens here; the evidence stage does the verifying, so a fetch problem and an
-# integrity problem stay distinguishable. batch-get-image needs ecr:BatchGetImage, which
-# this role already holds for publication read-back, so no permission changes.
+# exactly those bytes, so a later reader recomputes it rather than trusting this job; an
+# earlier binding without them could only be recorded as derived. The evidence stage does
+# the verifying, keeping a fetch problem distinct from an integrity problem.
+# batch-get-image uses the ecr:BatchGetImage this role holds for publication read-back.
 
 .ecr-publish-template:
   extends: .docker-dind

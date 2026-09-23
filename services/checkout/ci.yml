@@ -1,8 +1,7 @@
 # Declarative configuration for checkout. Behaviour lives in ci/templates.
 #
-# checkout is the first service wired to the platform registry. Only the repository name
-# is written here: the account-bearing registry host arrives as a masked project variable,
-# because it identifies the AWS account.
+# Only the repository name is written here: the account-bearing registry host arrives as a
+# masked project variable, because it identifies the AWS account.
 #
 # The health job points the service at addresses that do not resolve. Its gRPC clients
 # connect lazily, so the container starts and serves without the rest of the fleet, and
@@ -68,11 +67,9 @@ checkout:health-test:
 
 checkout:publish:
   extends: .ecr-publish-template
-  # Both security gates are prerequisites, not ordering preferences. GitLab refuses to
-  # create a pipeline whose job needs one that is not in it, so a rule change that dropped
-  # either gate would fail the pipeline instead of producing a publishable image that
-  # nothing scanned. The image pass and the source pass cover different things and neither
-  # is evidence for the other, which is why both are named.
+  # Both scan gates are mandatory needs, and neither is evidence for the other: GitLab
+  # refuses a pipeline missing either one instead of offering an unscanned publish.
+  # Rationale: ci/templates/ecr-publish.yml and ci/templates/trivy-scan.yml.
   needs:
     - job: checkout:build
     - job: checkout:scan-image

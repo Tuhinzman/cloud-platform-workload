@@ -1,18 +1,9 @@
-# Rust static validation. The toolchain image matches the builder stage of the service
-# Dockerfile, so a passing lint job compiles the crate on the same toolchain the image
-# build will use and a lint pass predicts a build pass.
+# The toolchain image matches the service Dockerfile's builder stage, so a lint pass
+# predicts a build pass. The image's minimal rustup profile omits clippy, hence the explicit
+# add. No formatter gate: no other tier runs one.
 #
-# The official Rust images install with the minimal rustup profile, which carries neither
-# clippy nor rustfmt, so clippy is added explicitly. This mirrors the Go tier, which
-# installs its linter rather than assuming the image ships one. The command is idempotent
-# and costs nothing if a future image tag starts including the component.
-#
-# No formatter gate. Neither the Go nor the Node tier checks formatting, and adding one
-# here would apply a control to Rust that the rest of the repository does not carry.
-#
-# --locked is the Rust equivalent of building against a committed go.sum: it refuses to
-# silently update Cargo.lock, so a dependency cannot move between the lint job and the
-# image build.
+# --locked refuses to update Cargo.lock, so a dependency cannot move between the lint job
+# and the image build.
 
 .lang-rust-template:
   stage: lint

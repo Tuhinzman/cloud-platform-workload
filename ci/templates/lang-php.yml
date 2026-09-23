@@ -1,35 +1,15 @@
-# PHP static validation.
+# The Composer image the service Dockerfile's vendor stage already pins, so no new image is
+# trusted; it carries both PHP and Composer. No linter, analyser or test runner: the service
+# declares no require-dev, and a tool installed here would be a control it does not own.
 #
-# The image is the same Composer image the service Dockerfile already pins for its vendor
-# stage, so this tier introduces no image into the repository that the build did not
-# already trust. It carries both a PHP runtime and Composer, which is what lets one job
-# cover both checks below.
+# php -l is the interpreter's parse step; -n1 because it checks only the first file given.
+# vendor/ is third-party code, covered by the scan stage rather than gated here.
 #
-# What this tier deliberately does NOT contain: a linter, a static analyser, and a test
-# runner. The PHP service in this repository declares no require-dev section, so no such
-# tool is available to it. Installing one here would add a control the service does not
-# own and would report on a configuration that exists nowhere in the repository.
-#
-# php -l is the strongest check PHP offers without adding a dependency: it is the parse
-# step of the interpreter, so it fails on any file the runtime could not load. vendor/ is
-# excluded because third-party sources are not this repository's to gate, and the scan
-# stage is what covers dependency risk. -n1 keeps one file per invocation, because php -l
-# reports only the first file it is given.
-#
-# composer validate checks the manifest the vendor stage installs from, and its lock check
-# is now the reason this line matters. The service commits composer.lock, the source gate
-# reads that lock file, and the vendor stage installs from it, so manifest and lock drifting
-# apart would mean scanning one dependency set and shipping another. --no-check-lock used to
-# be here because no lock file existed; keeping it now would disable exactly the check the
-# evidence model depends on.
-#
-# composer install is not a substitute, and that was measured on this pinned image rather
-# than assumed: against a manifest edited out of step with the lock, install reported the
-# drift as a Warning and only failed because that particular edit also broke a constraint.
-# validate reports it as a lock file error and exits non-zero on the drift itself.
-#
-# --no-check-publish drops the packagist-readiness rules, which do not apply to a service
-# that is never published as a library.
+# Keep composer validate's lock check (no --no-check-lock): the source gate scans
+# composer.lock and the vendor stage installs from it, so manifest/lock drift would mean
+# scanning one set and shipping another. validate exits non-zero on that drift; composer
+# install, measured on this pinned image, only warns. --no-check-publish skips packagist
+# rules that do not apply to an unpublished service.
 
 .lang-php-template:
   stage: lint

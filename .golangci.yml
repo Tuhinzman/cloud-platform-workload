@@ -1,22 +1,13 @@
-# GolangCI-Lint policy for this repository.
+# golangci-lint v2 rejects a configuration file without the version key.
 #
-# The version key is required: golangci-lint v2 rejects a configuration file that
-# does not declare it.
-#
-# This file records the lint policy that is currently in force. It is deliberately
-# small. Nothing here disables a linter, and every exclusion below is a decision
-# with a stated reason rather than a blanket allowance.
+# Nothing here disables a linter, and every exclusion below states its reason.
 
 version: "2"
 
 linters:
   exclusions:
-    # Restores the standard error-handling exclusion that golangci-lint v1 applied
-    # from its default exclusion set (EXC0001). v2 ships no default exclusions, so
-    # without naming this preset the deferred Close and Flush error returns that v1
-    # had always filtered are reported as findings. Naming it keeps the gate's
-    # behaviour on those calls the same as it was under v1, explicitly rather than
-    # implicitly.
+    # v2 ships no default exclusions; this preset restores v1's EXC0001, so deferred
+    # Close and Flush error returns stay unreported as they were under v1.
     presets:
       - std-error-handling
 

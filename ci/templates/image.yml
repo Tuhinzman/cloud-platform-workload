@@ -4,15 +4,13 @@
 # controls every container on that host, which is the pattern this project rejected, and
 # the dind service needs no runner of our own.
 #
-# The dind daemon is started with --mtu=1360, and the number is not a guess. GitLab lowered
-# its hosted-runner network MTU to 1360 in May 2026, and the inner Docker daemon creates
-# its own bridge at the default 1500 rather than inheriting that, so a build container
-# advertises a segment size the path cannot carry. Servers that honour path MTU discovery
-# recover; api.nuget.org behind Microsoft Front Door filters the ICMP it would need and
-# hangs instead, which is how one package index that never answered ran a cart build to
-# the job timeout six times. 1400 was tried first and still hung, since it is above 1360.
-# GitLab documents the value and the alternative FF_NETWORK_PER_BUILD; the flag is used
-# because it is one line in the one place every build shares.
+# The dind daemon runs with --mtu=1360, GitLab's hosted-runner network MTU since May 2026;
+# the inner daemon's bridge otherwise defaults to 1500, which the path cannot carry. Hosts
+# that honour path MTU discovery recover, but api.nuget.org behind Microsoft Front Door
+# filters the ICMP that discovery relies on, so a restore hangs to the job timeout. 1400
+# was tried first and still hung, since it is above 1360. GitLab also documents the
+# alternative FF_NETWORK_PER_BUILD; --mtu is used because it is one line in the one place
+# every build shares.
 #
 # The build stays local. Nothing reaches the registry before the scan gate has run, so
 # the image travels to the later stages as a saved tar artifact rather than a registry

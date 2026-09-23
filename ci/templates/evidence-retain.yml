@@ -5,12 +5,10 @@
 # are already unrecoverable, and shipping's and quote's had to be rescued by hand. A fleet
 # publishes more artifacts, not fewer, so the mechanism has to be structural.
 #
-# Where the bundle lives is a measured decision rather than a preference. This project is
-# public, and on a public GitLab project the package registry is readable by anyone on the
-# internet, which disqualifies it for raw vulnerability reports. Job artifacts are not:
-# project-based pipeline visibility is off here, so they are readable only by project
-# members. So the evidence stays where it already is and stops expiring, rather than moving
-# somewhere more durable but less private.
+# Where the bundle lives is measured, not preferred. It stays in job artifacts, which stop
+# expiring, rather than the more durable package registry, which on this public GitLab project
+# is readable by anyone and so unfit for raw vulnerability reports. Job artifacts are readable
+# only by project members because project-based pipeline visibility is off here.
 #
 # expire_in: never is the retention rule because the alternative cannot be expressed. The
 # invariant is that evidence for a digest still referenced by GitOps, or retained as
@@ -20,12 +18,6 @@
 # Evidence identity is component + source commit + published digest, and the generator
 # refuses to overwrite one identity with different bytes, so a retried job either
 # reproduces the bundle exactly or fails.
-#
-# The bundle carries the blocking gate's exit status and the vulnerability database metadata as
-# files, not only as manifest fields. Both were always produced and kept as scan-job artifacts,
-# but a reader holding the bundle alone had to take those two claims on trust; retaining the
-# bytes is what makes the gate result and the database provenance checkable rather than
-# asserted. That is the schema 1 to 2 change, and schema 1 bundles stay valid as written.
 #
 # The job runs after a successful publish and is not optional. That is the promotion
 # contract: a published digest becomes eligible for GitOps promotion only once this job has
@@ -69,11 +61,9 @@
         --publication-timestamp "$(cat published-at.txt)" \
         --out-dir evidence
     # Covers the manifest as well as the raw files, so the whole bundle verifies with one
-    # command and the manifest is not the only thing vouching for itself.
-    #
-    # The file list is read from the bundle rather than written out here. A named list has to be
-    # edited in lockstep with the generator, and the one thing worse than an uncovered file is a
-    # checksum file that looks complete and is not.
+    # command and the manifest does not vouch for itself. The file list is read from the
+    # bundle rather than named here, so a file the generator adds cannot be missed by a
+    # checksum file that still looks complete.
     - |
       bundle="evidence/${SERVICE_NAME}/${CI_COMMIT_SHA}/$(cut -d: -f2 digest.txt)"
       cd "${bundle}"
