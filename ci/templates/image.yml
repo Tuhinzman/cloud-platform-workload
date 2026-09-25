@@ -89,3 +89,15 @@
     - docker rm -f "${SERVICE_NAME}-health" || true
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/image.yml"]
+
+# For services that publish. publish needs this job and GitLab refuses a pipeline that lacks a
+# needed job, so on main it follows publish onto the publish chain's own templates as well.
+.image-health-publisher-template:
+  extends: .image-health-template
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/image.yml"]
+    - if: $CI_COMMIT_BRANCH == "main"
+      changes:
+        - "ci/templates/trivy-scan.yml"
+        - "ci/templates/ecr-publish.yml"
+        - "ci/templates/evidence-retain.yml"

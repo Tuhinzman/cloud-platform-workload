@@ -41,7 +41,7 @@ quote:scan-source:
 # Sets only QUOTE_PORT (public/index.php:100). IPV6_ENABLED is optional and unset binds
 # 0.0.0.0; quote calls no other service, so no placeholder addresses are needed.
 quote:health-test:
-  extends: .image-health-template
+  extends: .image-health-publisher-template
   dependencies:
     - quote:build
   variables:
@@ -58,6 +58,8 @@ quote:publish:
     - job: quote:scan-image
       artifacts: false
     - job: quote:scan-source
+      artifacts: false
+    - job: quote:health-test
       artifacts: false
   variables:
     <<: *quote-vars

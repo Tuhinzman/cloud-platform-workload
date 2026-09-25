@@ -174,7 +174,7 @@ class FanOut(unittest.TestCase):
                 self.assertEqual(got & scan, scan)
 
     def test_health_is_not_dragged_in_by_the_publish_chain(self):
-        health = jobs_extending(".image-health-template")
+        health = health_jobs()
         self.assertEqual(names(["ci/templates/ecr-publish.yml"]) & health, set())
         self.assertEqual(names(["ci/templates/image.yml"]) & health, health)
 
@@ -448,12 +448,13 @@ class LockBuildBinding(unittest.TestCase):
 
 
 HEALTH_TEMPLATE = ".image-health-template"
+HEALTH_PUBLISHER_TEMPLATE = ".image-health-publisher-template"
 DEFERRED = "deferred-to-runtime"
 VALIDATED = "validated-in-ci"
 
 
 def health_jobs():
-    return jobs_extending(HEALTH_TEMPLATE)
+    return jobs_extending(HEALTH_TEMPLATE) | jobs_extending(HEALTH_PUBLISHER_TEMPLATE)
 
 
 def health_mode(config, job):
@@ -568,3 +569,218 @@ class DeferredHealth(unittest.TestCase):
                 if os.path.isfile(p) and not any(s in p for s in skip)
                 and token in open(p, errors="ignore").read()]
         self.assertEqual(hits, [])
+
+
+PUBLISH_TEMPLATE = ".ecr-publish-template"
+MAIN = {"source": "push", "branch": "main", "open_mr": False,
+        "new_branch_no_compare": False, "default_branch": "main"}
+
+
+def publishers():
+    return {job.split(":")[0] for job in jobs_extending(PUBLISH_TEMPLATE)}
+
+
+def runnable(config, jobs, status, name):
+    """GitLab's start condition, reduced to what this repository uses: a job with needs starts
+    once every needed job in the pipeline has succeeded, one without needs once every job in an
+    earlier stage has. A manual job becomes playable on the same condition."""
+    body = ci_graph.resolve(config, name)
+    present = {j["job"] for j in jobs}
+    if "needs" in body:
+        return all(status[n] == "success" for n, _ in ci_graph.needs_of(body) if n in present)
+    order = yaml.safe_load(open(os.path.join(ROOT, ".gitlab-ci.yml")))["stages"]
+    earlier = {j["job"] for j in jobs if order.index(j["stage"]) < order.index(body["stage"])}
+    return all(status[n] == "success" for n in earlier)
+
+
+class PublishHealthGate(unittest.TestCase):
+    """An image whose own health test failed must never become publishable."""
+
+    def service_job(self, svc, suffix):
+        return yaml.safe_load(open(os.path.join(ROOT, "services", svc, "ci.yml")))[f"{svc}:{suffix}"]
+
+    def test_every_publisher_needs_its_own_health_test(self):
+        self.assertTrue(publishers())
+        for svc in sorted(publishers()):
+            with self.subTest(service=svc):
+                needed = dict(ci_graph.needs_of(self.service_job(svc, "publish")))
+                self.assertIn(f"{svc}:health-test", needed, "publish must need its health test")
+                self.assertFalse(needed[f"{svc}:health-test"], "the health need must not be optional")
+
+    def test_publisher_health_template_is_used_by_publishers_only(self):
+        users = {job.split(":")[0] for job in jobs_extending(HEALTH_PUBLISHER_TEMPLATE)}
+        self.assertEqual(users, publishers())
+
+    def test_publisher_health_rules_add_only_the_publish_chain_on_main(self):
+        cfg = ci_graph.load_config(ROOT)
+        base = cfg[HEALTH_TEMPLATE]["rules"]
+        own = cfg[HEALTH_PUBLISHER_TEMPLATE]["rules"]
+        chain = cfg[PUBLISH_TEMPLATE]["rules"][0]["changes"]
+        self.assertEqual(own[0], base[0], "outside main, publishers fan out like any service")
+        self.assertEqual(own[1]["if"], cfg[PUBLISH_TEMPLATE]["rules"][0]["if"])
+        self.assertEqual(set(own[0]["changes"]) | set(own[1]["changes"]), set(chain))
+        self.assertEqual(len(own), 2)
+
+    def test_publish_never_appears_without_its_health_test_in_any_changeset(self):
+        probes = [[p] for p in (
+            ".gitlab-ci.yml", "README.md", "pb/demo.proto", "ci/tools/ci_graph.py",
+            *CHAIN_TEMPLATES, *sorted(glob.glob("ci/templates/lang-*.yml")),
+        )] + [[f"services/{s}/ci.yml"] for s in services()]
+        for source, branch in (("merge_request_event", None), ("push", "main")):
+            for paths in probes:
+                got, _, _ = evaluate(paths, source=source, branch=branch)
+                for job in got:
+                    if job.endswith(":publish"):
+                        svc = job.split(":")[0]
+                        self.assertIn(f"{svc}:health-test", got,
+                                      f"{paths} on {source}: {job} without its health test")
+
+    def test_a_failed_health_test_leaves_publish_unplayable(self):
+        paths = [f"services/{s}/ci.yml" for s in services()]
+        _, config, jobs = evaluate(paths, source="push", branch="main")
+        for svc in sorted(publishers()):
+            with self.subTest(service=svc):
+                status = {j["job"]: "success" for j in jobs}
+                self.assertTrue(runnable(config, jobs, status, f"{svc}:publish"),
+                                "with every prerequisite green, publish must be playable")
+                status[f"{svc}:health-test"] = "failed"
+                self.assertFalse(runnable(config, jobs, status, f"{svc}:publish"))
+
+    def test_removing_the_health_need_is_caught(self):
+        """The negative control: without the need, the same failed health test leaves publish
+        playable, which is the gap the need closes."""
+        config = ci_graph.load_config(ROOT)
+        svc = sorted(publishers())[0]
+        broken = copy.deepcopy(config)
+        broken[f"{svc}:publish"]["needs"] = [n for n in broken[f"{svc}:publish"]["needs"]
+                                             if n["job"] != f"{svc}:health-test"]
+        jobs, _ = ci_graph.evaluate(broken, [f"services/{svc}/ci.yml"], MAIN)
+        status = {j["job"]: "success" for j in jobs}
+        status[f"{svc}:health-test"] = "failed"
+        self.assertTrue(runnable(broken, jobs, status, f"{svc}:publish"))
+
+    def test_dropping_the_main_health_rule_makes_the_graph_invalid(self):
+        """The second negative control: if the health test stops following publish onto main,
+        GitLab must refuse the pipeline rather than offer an untested publish."""
+        config = ci_graph.load_config(ROOT)
+        broken = copy.deepcopy(config)
+        broken[HEALTH_PUBLISHER_TEMPLATE]["rules"] = copy.deepcopy(config[HEALTH_TEMPLATE]["rules"])
+        jobs, _ = ci_graph.evaluate(broken, ["ci/templates/ecr-publish.yml"], MAIN)
+        present = {j["job"] for j in jobs}
+        self.assertTrue(any(j.endswith(":publish") for j in present), "probe must reach publish")
+        self.assertFalse(any(j.endswith(":health-test") for j in present), "probe must drop health")
+        errors = ci_graph.validate_needs(broken, jobs)
+        self.assertTrue(any("health-test" in e for e in errors), errors)
+
+
+SOURCE_DEPENDENCY_VALUES = {"declared", "none"}
+
+
+def source_dependency_check(config=None):
+    config = config or ci_graph.load_config(ROOT)
+    steps = ci_graph.resolve(config, SOURCE_SCAN_TEMPLATE)["script"]
+    return [i for i, s in enumerate(steps) if 'case "${SOURCE_DEPENDENCIES}"' in s], steps
+
+
+def run_step(step, **env):
+    import subprocess
+    return subprocess.run(["sh", "-c", step], capture_output=True, text=True,
+                          env={"PATH": os.environ["PATH"], **env})
+
+
+class SourceDependencyValue(unittest.TestCase):
+    """The coverage check acts only on declared, so any other value used to skip it quietly."""
+
+    def step(self):
+        found, steps = source_dependency_check()
+        self.assertEqual(len(found), 1, "exactly one value check")
+        return steps[found[0]]
+
+    def test_the_value_is_checked_before_anything_is_scanned(self):
+        found, _ = source_dependency_check()
+        self.assertEqual(found, [0])
+
+    def test_the_contract_values_pass(self):
+        for value in sorted(SOURCE_DEPENDENCY_VALUES):
+            with self.subTest(value=value):
+                r = run_step(self.step(), SOURCE_DEPENDENCIES=value)
+                self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+    def test_any_other_value_fails_closed(self):
+        for value in ("", "Declared", "NONE", "declared ", " none", "true", "false", "yes",
+                      "declared,none", "nonee", "*"):
+            with self.subTest(value=value):
+                r = run_step(self.step(), SOURCE_DEPENDENCIES=value)
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("must be declared or none", r.stdout)
+
+    def test_unset_fails_closed(self):
+        r = run_step(self.step())
+        self.assertEqual(r.returncode, 1)
+
+    def test_every_source_scan_resolves_to_a_contract_value(self):
+        """Unset in a service means the template's declared, which is a contract value."""
+        config = ci_graph.load_config(ROOT)
+        for job in sorted(jobs_extending(SOURCE_SCAN_TEMPLATE)):
+            with self.subTest(job=job):
+                value = ci_graph.resolve(config, job)["variables"].get("SOURCE_DEPENDENCIES")
+                self.assertIn(value, SOURCE_DEPENDENCY_VALUES)
+
+    def test_an_accepting_check_is_caught(self):
+        """The negative control: a check that lets an unknown value through exits 0 here, so the
+        fail-closed test above would fail on it."""
+        mutant = self.step().replace("declared|none) ;;", "declared|none|*) ;;")
+        self.assertNotEqual(mutant, self.step())
+        self.assertEqual(run_step(mutant, SOURCE_DEPENDENCIES="nonee").returncode, 0)
+        config = copy.deepcopy(ci_graph.load_config(ROOT))
+        config[SOURCE_SCAN_TEMPLATE]["script"] = config[SOURCE_SCAN_TEMPLATE]["script"][1:]
+        self.assertEqual(source_dependency_check(config)[0], [], "a removed check must be visible")
+
+
+def retained_access_violations(config):
+    """Every never-expiring artifact is retained evidence, so each must be Developer-only."""
+    out = []
+    for name in config:
+        if name.startswith("__"):
+            continue
+        artifacts = ci_graph.resolve(config, name).get("artifacts") or {}
+        if artifacts.get("expire_in") == "never" and (
+                artifacts.get("access") != "developer" or "public" in artifacts):
+            out.append(name)
+    return sorted(out)
+
+
+class RetainedEvidenceAccess(unittest.TestCase):
+    """Retained scan, publish and evidence artifacts stay Developer-only through the UI and API,
+    independent of the project's pipeline visibility setting."""
+
+    def test_the_retained_set_is_the_evidence_chain(self):
+        config = ci_graph.load_config(ROOT)
+        retained = {name for name in config if name.startswith(".")
+                    and (config[name].get("artifacts") or {}).get("expire_in") == "never"}
+        self.assertEqual(retained, {".trivy-scan-template", SOURCE_SCAN_TEMPLATE,
+                                    PUBLISH_TEMPLATE, ".evidence-retain-template"})
+
+    def test_every_retained_artifact_is_developer_only(self):
+        config = ci_graph.load_config(ROOT)
+        self.assertEqual(retained_access_violations(config), [])
+
+    def test_no_ci_file_uses_artifacts_public(self):
+        """public is superseded by access, and GitLab rejects the two in one job."""
+        for path in [".gitlab-ci.yml", *glob.glob(os.path.join(ROOT, "ci", "templates", "*.yml")),
+                     *glob.glob(os.path.join(ROOT, "services", "*", "ci.yml"))]:
+            doc = yaml.safe_load(open(os.path.join(ROOT, path))) or {}
+            for key, body in doc.items():
+                if isinstance(body, dict) and isinstance(body.get("artifacts"), dict):
+                    with self.subTest(file=path, job=key):
+                        self.assertNotIn("public", body["artifacts"])
+
+    def test_removing_access_is_caught(self):
+        """The negative control: dropping access from any one retained template is reported."""
+        config = ci_graph.load_config(ROOT)
+        for template in (".trivy-scan-template", SOURCE_SCAN_TEMPLATE, PUBLISH_TEMPLATE,
+                         ".evidence-retain-template"):
+            with self.subTest(template=template):
+                broken = copy.deepcopy(config)
+                del broken[template]["artifacts"]["access"]
+                self.assertIn(template, retained_access_violations(broken))

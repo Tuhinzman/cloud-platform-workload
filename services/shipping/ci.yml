@@ -48,7 +48,7 @@ shipping:scan-source:
 # request and has a default, so it stays unset: this job does not exercise quote. IPV6_ENABLED
 # is optional; unset, the bind is 0.0.0.0, which the check connects to.
 shipping:health-test:
-  extends: .image-health-template
+  extends: .image-health-publisher-template
   dependencies:
     - shipping:build
   variables:
@@ -65,6 +65,8 @@ shipping:publish:
     - job: shipping:scan-image
       artifacts: false
     - job: shipping:scan-source
+      artifacts: false
+    - job: shipping:health-test
       artifacts: false
   variables:
     <<: *shipping-vars

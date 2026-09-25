@@ -37,7 +37,7 @@ frontend-proxy:scan-source:
 # address fails bootstrap validation (SocketAddressValidationError). Cluster hosts are STRICT_DNS
 # and need not resolve, so this proves the listener starts, not that a route reaches an upstream.
 frontend-proxy:health-test:
-  extends: .image-health-template
+  extends: .image-health-publisher-template
   dependencies:
     - frontend-proxy:build
   variables:
@@ -74,6 +74,8 @@ frontend-proxy:publish:
     - job: frontend-proxy:scan-image
       artifacts: false
     - job: frontend-proxy:scan-source
+      artifacts: false
+    - job: frontend-proxy:health-test
       artifacts: false
   variables:
     <<: *frontend-proxy-vars

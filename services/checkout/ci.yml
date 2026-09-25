@@ -45,7 +45,7 @@ checkout:scan-source:
 # Dependency addresses deliberately do not resolve (gRPC connects lazily), so no other service
 # is needed and this proves startup only.
 checkout:health-test:
-  extends: .image-health-template
+  extends: .image-health-publisher-template
   dependencies:
     - checkout:build
   variables:
@@ -68,6 +68,8 @@ checkout:publish:
     - job: checkout:scan-image
       artifacts: false
     - job: checkout:scan-source
+      artifacts: false
+    - job: checkout:health-test
       artifacts: false
   variables:
     <<: *checkout-vars

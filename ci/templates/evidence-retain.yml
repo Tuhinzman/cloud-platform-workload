@@ -36,6 +36,7 @@
       sha256sum -c SHA256SUMS
       cd "${CI_PROJECT_DIR}"
   artifacts:
+    access: developer
     paths:
       - evidence/
     # No time-based rule knows which digests GitOps still references; removal is an owner action.

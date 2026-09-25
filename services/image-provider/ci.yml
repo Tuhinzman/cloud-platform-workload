@@ -36,7 +36,7 @@ image-provider:scan-source:
 # Sets exactly the four variables the Dockerfile's envsubst names. The resolver is a literal in
 # the template and the OTEL endpoint resolves only at export, so nginx starts without a collector.
 image-provider:health-test:
-  extends: .image-health-template
+  extends: .image-health-publisher-template
   dependencies:
     - image-provider:build
   variables:
@@ -56,6 +56,8 @@ image-provider:publish:
     - job: image-provider:scan-image
       artifacts: false
     - job: image-provider:scan-source
+      artifacts: false
+    - job: image-provider:health-test
       artifacts: false
   variables:
     <<: *image-provider-vars

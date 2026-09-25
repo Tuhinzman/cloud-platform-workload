@@ -50,6 +50,7 @@
       printf '%s\n' "${gate_rc}" > trivy-gate-rc.txt
       exit "${gate_rc}"
   artifacts:
+    access: developer
     paths:
       - trivy-findings.json
       - sbom.cdx.json
@@ -96,6 +97,16 @@
     - touch .trivy-combined-ignore.txt
     - if [ -f "${SERVICE_PATH}/.trivyignore" ]; then cat "${SERVICE_PATH}/.trivyignore" >> .trivy-combined-ignore.txt; fi
   script:
+    # The coverage check below acts only on declared; any other value, empty included, would
+    # skip it silently, so it fails here before anything is scanned.
+    - |
+      case "${SOURCE_DEPENDENCIES}" in
+        declared|none) ;;
+        *)
+          echo "FAIL: SOURCE_DEPENDENCIES must be declared or none, got '${SOURCE_DEPENDENCIES}'"
+          exit 1
+          ;;
+      esac
     # Informational pass first, as in the image scan, so a blocked run still leaves findings.
     - |
       trivy fs \
@@ -138,6 +149,7 @@
       printf '%s\n' "${gate_rc}" > trivy-source-gate-rc.txt
       exit "${gate_rc}"
   artifacts:
+    access: developer
     paths:
       - trivy-source-findings.json
       - trivy-source-gate-rc.txt
