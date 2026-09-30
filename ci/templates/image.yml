@@ -124,7 +124,7 @@
           echo "FAIL: ${SERVICE_NAME} did not stay running for ${HEALTH_RUNNING_SECONDS} s"
           exit 1
         fi
-        echo "RUNNING, NOT FUNCTIONAL HEALTH: ${SERVICE_NAME} stayed up ${HEALTH_RUNNING_SECONDS} s without listening"
+        echo "RUNNING, NOT FUNCTIONAL HEALTH: ${SERVICE_NAME} stayed up ${HEALTH_RUNNING_SECONDS} s; no port was probed"
         exit 0
       fi
     # The probe must first read a container that listens on nothing, on the same port, as closed;
