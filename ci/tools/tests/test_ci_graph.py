@@ -156,10 +156,10 @@ class FanOut(unittest.TestCase):
                 self.assertEqual(got, expected | {CONTROL_JOB})
 
     def test_language_tier_change_reaches_its_consumers_only(self):
-        for tier in ("go", "node", "php", "rust", "dotnet", "elixir"):
+        for tier in ("go", "node", "php", "rust", "dotnet", "elixir", "java"):
             with self.subTest(tier=tier):
                 expected = set()
-                for suffix in ("-template", "-test-template", "-parse-template"):
+                for suffix in ("-template", "-test-template", "-parse-template", "-gradle-template"):
                     expected |= jobs_extending(f".lang-{tier}{suffix}")
                 self.assertEqual(names([f"ci/templates/lang-{tier}.yml"]), expected | {CONTROL_JOB})
                 self.assertTrue(expected, f"lang-{tier} has no consumer")

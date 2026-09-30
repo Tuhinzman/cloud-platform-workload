@@ -1,0 +1,35 @@
+# Each template runs the builder image and Gradle its services' Dockerfiles use, so no new image is
+# trusted. One image cannot serve both: measured, on JDK 21 fraud-detection fails Kotlin's
+# JVM-target check. Neither service ships test sources, so there is no test template.
+
+# classes, not check: check adds ad's verifyGoogleJavaFormat, which fails on unmodified upstream
+# (plugin 0.9 reports every file as a syntax error here, and google-java-format 1.18.1 itself
+# would reformat all four files). Making it pass changes upstream files, an open decision.
+.lang-java-template:
+  stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+  image: eclipse-temurin:21-jdk
+  script:
+    - cd "${SERVICE_PATH}"
+    - ./gradlew --version
+    - ./gradlew classes
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-java.yml"]
+
+# The image's own Gradle, not the committed wrapper, because that is what the image build runs.
+# PROTO_DIR is where the Dockerfile copies pb/; without the copy no stubs are generated and the
+# sources do not resolve.
+.lang-java-gradle-template:
+  stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+  image: gradle:8-jdk17
+  script:
+    - mkdir -p "${SERVICE_PATH}/${PROTO_DIR:?}"
+    - cp -R pb/. "${SERVICE_PATH}/${PROTO_DIR}/"
+    - cd "${SERVICE_PATH}"
+    - gradle --version
+    - gradle classes
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-java.yml"]

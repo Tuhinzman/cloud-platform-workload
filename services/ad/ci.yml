@@ -1,0 +1,52 @@
+# Declarative configuration for ad; behaviour lives in ci/templates. No publish or evidence
+# job: ad has no ECR repository and none is authorized.
+
+.ad-vars: &ad-vars
+  SERVICE_NAME: ad
+  SERVICE_PATH: services/ad
+  LANG_TIER: java
+  # ad COPYs pb/ into its build and generates its gRPC stubs from it, so a change to the
+  # shared contract changes what ad builds.
+  SERVICE_SHARED_INPUTS: pb/**/*
+
+ad:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *ad-vars
+
+ad:lint-java:
+  extends: .lang-java-template
+  variables:
+    <<: *ad-vars
+
+ad:build:
+  extends: .image-build-template
+  variables:
+    <<: *ad-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+ad:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - ad:build
+  variables:
+    <<: *ad-vars
+
+# The scanner reads Gradle only through a gradle.lockfile, which ad does not commit, so this
+# resolves zero packages and fails closed. Adding one changes build files, an open decision.
+ad:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *ad-vars
+
+# Measured: ad listens with neither flagd nor a collector reachable, so AD_PORT is the only input.
+ad:health-test:
+  extends: .image-health-template
+  dependencies:
+    - ad:build
+  variables:
+    <<: *ad-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e AD_PORT=8080

@@ -1,0 +1,53 @@
+# Declarative configuration for fraud-detection; behaviour lives in ci/templates. No publish or
+# evidence job: fraud-detection has no ECR repository and none is authorized.
+
+.fraud-detection-vars: &fraud-detection-vars
+  SERVICE_NAME: fraud-detection
+  SERVICE_PATH: services/fraud-detection
+  LANG_TIER: java
+  # fraud-detection COPYs pb/ into its build and generates its stubs from it, so a change to
+  # the shared contract changes what it builds.
+  SERVICE_SHARED_INPUTS: pb/**/*
+
+fraud-detection:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *fraud-detection-vars
+
+fraud-detection:lint-java:
+  extends: .lang-java-gradle-template
+  variables:
+    <<: *fraud-detection-vars
+    PROTO_DIR: src/main/proto
+
+fraud-detection:build:
+  extends: .image-build-template
+  variables:
+    <<: *fraud-detection-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+fraud-detection:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - fraud-detection:build
+  variables:
+    <<: *fraud-detection-vars
+
+# The scanner reads Gradle only through a gradle.lockfile, which fraud-detection does not commit,
+# so this resolves zero packages and fails closed. Adding one changes build files, an open decision.
+fraud-detection:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *fraud-detection-vars
+
+fraud-detection:health-test:
+  extends: .image-health-template
+  dependencies: []
+  variables:
+    <<: *fraud-detection-vars
+    HEALTH_MODE: deferred-to-runtime
+    HEALTH_REASON: >-
+      a Kafka consumer with no listener: it opens no TCP socket even while running against a
+      resolvable closed broker, and an unresolvable KAFKA_ADDR fails the consumer constructor
+      at main.kt:48 and exits 1
