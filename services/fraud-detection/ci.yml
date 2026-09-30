@@ -34,8 +34,6 @@ fraud-detection:scan-image:
   variables:
     <<: *fraud-detection-vars
 
-# The scanner reads Gradle only through a gradle.lockfile, which fraud-detection does not commit,
-# so this resolves zero packages and fails closed. Adding one changes build files, an open decision.
 fraud-detection:scan-source:
   extends: .trivy-source-scan-template
   variables:

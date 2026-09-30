@@ -33,8 +33,6 @@ ad:scan-image:
   variables:
     <<: *ad-vars
 
-# The scanner reads Gradle only through a gradle.lockfile, which ad does not commit, so this
-# resolves zero packages and fails closed. Adding one changes build files, an open decision.
 ad:scan-source:
   extends: .trivy-source-scan-template
   variables:

@@ -1,3 +1,8 @@
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: dependencies are locked in strict mode outside the -Pspeed path, so every resolved
+// configuration must match the committed gradle.lockfile, the file the source scan reads.
+// Change: jackson raised from 2.20.1 to 2.21.7 and aligned through its BOM, and netty aligned
+// on 4.2.18.Final through its BOM, to clear the HIGH and CRITICAL findings both scans reported.
 
 plugins {
     id 'com.google.protobuf' version '0.9.6'
@@ -19,7 +24,7 @@ version = "0.1.0-SNAPSHOT"
 def opentelemetryVersion = "1.57.0"
 def opentelemetryInstrumentationVersion = "2.23.0"
 def grpcVersion = "1.78.0"
-def jacksonVersion = "2.20.1"
+def jacksonVersion = "2.21.7"
 def protocVersion = "4.33.2"
 
 tasks.withType(JavaCompile).configureEach {
@@ -33,12 +38,23 @@ ext {
     offlineCompile = output.get().asFile
 }
 
+// -Pspeed compiles against the jars downloadRepos copied, not a resolved graph; locked, it fails
+// on every lock entry it never resolves (measured), so only the resolving build is locked.
+if (!speed) {
+    dependencyLocking {
+        lockAllConfigurations()
+        lockMode = LockMode.STRICT
+    }
+}
+
 dependencies {
     if (speed) {
         implementation fileTree(dir: offlineCompile, include: '*.jar')
     } else {
         implementation platform("io.opentelemetry:opentelemetry-bom:${opentelemetryVersion}")
         implementation platform("io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:${opentelemetryInstrumentationVersion}")
+        implementation platform("com.fasterxml.jackson:jackson-bom:${jacksonVersion}")
+        implementation platform("io.netty:netty-bom:4.2.18.Final")
 
         implementation "com.google.api.grpc:proto-google-common-protos:2.63.2",
                 "com.google.protobuf:protobuf-java:${protocVersion}",

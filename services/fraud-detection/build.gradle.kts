@@ -1,3 +1,9 @@
+// Modified from the upstream OpenTelemetry Demo release 2.2.0.
+// Change: dependencies are locked in strict mode, so every resolved configuration must match
+// the committed gradle.lockfile, the file the source scan reads.
+// Change: kafka-clients raised from 4.1.1 to 4.1.2, and jackson (2.21.7) and netty
+// (4.2.18.Final) aligned through their BOMs, to clear the HIGH and CRITICAL findings both
+// scans reported.
 
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import com.google.protobuf.gradle.*
@@ -25,13 +31,20 @@ repositories {
     gradlePluginPortal()
 }
 
+dependencyLocking {
+    lockAllConfigurations()
+    lockMode.set(LockMode.STRICT)
+}
+
 
 
 dependencies {
+    implementation(platform("com.fasterxml.jackson:jackson-bom:2.21.7"))
+    implementation(platform("io.netty:netty-bom:4.2.18.Final"))
     implementation("com.google.protobuf:protobuf-java:${protobufVersion}")
     testImplementation(kotlin("test"))
     implementation(kotlin("script-runtime"))
-    implementation("org.apache.kafka:kafka-clients:4.1.1")
+    implementation("org.apache.kafka:kafka-clients:4.1.2")
     implementation("com.google.api.grpc:proto-google-common-protos:2.63.2")
     implementation("io.grpc:grpc-protobuf:${grpcVersion}")
     implementation("io.grpc:grpc-stub:${grpcVersion}")

@@ -390,6 +390,7 @@ class LockBuildBinding(unittest.TestCase):
         "pip": "requirements.lock",
         "bundler": "Gemfile.lock",
         "mix": "mix.lock",
+        "gradle": "gradle.lockfile",
     }
 
     def committed_lockfiles(self, filename):
@@ -449,26 +450,43 @@ class LockBuildBinding(unittest.TestCase):
                 variables = ci_graph.resolve(config, f"{svc}:scan-source").get("variables") or {}
                 self.assertEqual(variables.get("TRIVY_FILE_PATTERNS"), r"pip:requirements\.lock")
 
+    def test_gradle_builds_lock_strictly(self):
+        """Gradle ignores a lock file the build does not enable, and outside strict mode a
+        configuration with no lock state resolves unlocked. Measured in strict mode: a raised
+        version, an added or removed dependency and a deleted lock each fail the build. A
+        lowered version does not: a plain Gradle version is a minimum the locked one still
+        meets, so the build keeps shipping the locked version until the lock is rewritten."""
+        for svc in sorted(self.committed_lockfiles("gradle.lockfile")):
+            with self.subTest(service=svc):
+                build = "".join(open(p).read() for p in
+                                glob.glob(os.path.join(ROOT, "services", svc, "build.gradle*")))
+                self.assertTrue("lockAllConfigurations()" in build and "LockMode.STRICT" in build,
+                                f"{svc} commits gradle.lockfile but its build does not lock strictly")
+
     def test_a_committed_lockfile_has_a_tier_that_enforces_it(self):
         """The pairing, stated once rather than per service: if a service commits an
-        ecosystem lock file, that ecosystem's shared tier must enforce it."""
+        ecosystem lock file, that ecosystem's shared tier must enforce it. Gradle's strict mode
+        acts only on what a job resolves, and classes left a runtime-only dependency missing
+        from the lock unchecked (measured), so each Java tier runs its image's own task."""
         enforced = {
-            "nuget": ("ci/templates/lang-dotnet.yml", ".lang-dotnet-template", "--locked-mode"),
-            "composer": ("ci/templates/lang-php.yml", ".lang-php-template", "composer validate"),
-            "pip": ("ci/templates/lang-python.yml", ".lang-python-template",
-                    "diff requirements.lock /tmp/frozen"),
-            "bundler": ("ci/templates/lang-ruby.yml", ".lang-ruby-template",
-                        "BUNDLE_FROZEN=true bundle install"),
-            "mix": ("ci/templates/lang-elixir.yml", ".lang-elixir-template",
-                    "mix deps.get --check-locked"),
+            "nuget": [("ci/templates/lang-dotnet.yml", ".lang-dotnet-template", "--locked-mode")],
+            "composer": [("ci/templates/lang-php.yml", ".lang-php-template", "composer validate")],
+            "pip": [("ci/templates/lang-python.yml", ".lang-python-template",
+                     "diff requirements.lock /tmp/frozen")],
+            "bundler": [("ci/templates/lang-ruby.yml", ".lang-ruby-template",
+                         "BUNDLE_FROZEN=true bundle install")],
+            "mix": [("ci/templates/lang-elixir.yml", ".lang-elixir-template",
+                     "mix deps.get --check-locked")],
+            "gradle": [("ci/templates/lang-java.yml", ".lang-java-template", "./gradlew installDist"),
+                       ("ci/templates/lang-java.yml", ".lang-java-gradle-template", "gradle shadowJar")],
         }
         for ecosystem, filename in self.LOCKFILES.items():
             services_with = self.committed_lockfiles(filename)
             if not services_with:
                 continue
-            path, key, token = enforced[ecosystem]
-            with self.subTest(ecosystem=ecosystem, services=sorted(services_with)):
-                self.assertIn(token, self.tier_script(path, key))
+            for path, key, token in enforced[ecosystem]:
+                with self.subTest(ecosystem=ecosystem, template=key, services=sorted(services_with)):
+                    self.assertIn(token, self.tier_script(path, key))
 
     def test_every_source_scanned_service_declaring_dependencies_commits_a_lock(self):
         """--locked-mode does not require a lock file to exist: measured, against a project
@@ -489,7 +507,7 @@ class LockBuildBinding(unittest.TestCase):
                 # when every line is an exact pin: pip's is the verified freeze beside it.
                 names = ("package-lock.json", "packages.lock.json", "composer.lock",
                          "Cargo.lock", "go.sum", "poetry.lock", "Gemfile.lock", "mix.lock",
-                         "requirements.lock")
+                         "requirements.lock", "gradle.lockfile")
                 found = [m for name in names
                          for m in glob.glob(os.path.join(ROOT, "services", svc, "**", name), recursive=True)
                          if "node_modules" not in m and "/vendor/" not in m]

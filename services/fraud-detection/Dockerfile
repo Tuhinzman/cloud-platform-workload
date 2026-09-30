@@ -5,8 +5,13 @@
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout.
 # Change: the agent version carries a default. Upstream supplies it from a .env file this
 # repository does not carry, so without one the download URL loses its version and 404s.
-# 2.23.0 is the instrumentation version services/ad/build.gradle already pins, alongside
-# the OpenTelemetry API and SDK at 1.57.0 that both Java services compile against.
+# 2.26.1 is the first release that fixes CVE-2026-33701, a CRITICAL the image scan reported
+# against 2.23.0.
+# Change: runtime base moved from java17-debian12 to java17-debian13. Measured, not preferred:
+# the newest java17-debian12 digest still ships openjdk-17 17.0.18 and pcre2, expat and lcms2
+# revisions with nine fixable HIGH findings, and distroless has no package manager to upgrade
+# them in place. The debian13 base carries Temurin 17.0.20 and no fixable HIGH or CRITICAL
+# finding; the Java major is unchanged.
 
 FROM --platform=${BUILDPLATFORM} gradle:8-jdk17 AS builder
 
@@ -19,9 +24,9 @@ RUN gradle shadowJar
 
 # -----------------------------------------------------------------------------
 
-FROM gcr.io/distroless/java17-debian12:nonroot
+FROM gcr.io/distroless/java17-debian13:nonroot
 
-ARG OTEL_JAVA_AGENT_VERSION=2.23.0
+ARG OTEL_JAVA_AGENT_VERSION=2.26.1
 WORKDIR /usr/src/app/
 
 ADD --chmod=644 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v$OTEL_JAVA_AGENT_VERSION/opentelemetry-javaagent.jar /usr/src/app/opentelemetry-javaagent.jar

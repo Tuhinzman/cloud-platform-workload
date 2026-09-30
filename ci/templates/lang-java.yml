@@ -1,10 +1,11 @@
 # Each template runs the builder image and Gradle its services' Dockerfiles use, so no new image is
 # trusted. One image cannot serve both: measured, on JDK 21 fraud-detection fails Kotlin's
 # JVM-target check. Neither service ships test sources, so there is no test template.
+# Strict locking fails any resolution that differs from gradle.lockfile. Each job runs its
+# Dockerfile's task: measured, classes alone passed a runtime-only dependency missing from the lock.
 
-# classes, not check: check adds ad's verifyGoogleJavaFormat, which fails on unmodified upstream
-# (plugin 0.9 reports every file as a syntax error here, and google-java-format 1.18.1 itself
-# would reformat all four files). Making it pass changes upstream files, an open decision.
+# No formatter step: ad's declared google-java-format 1.18.1 cannot gate. Its plugin reported every
+# file as a syntax error, and run directly it would reformat all four unmodified upstream files.
 .lang-java-template:
   stage: lint
   variables:
@@ -13,7 +14,7 @@
   script:
     - cd "${SERVICE_PATH}"
     - ./gradlew --version
-    - ./gradlew classes
+    - ./gradlew installDist
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-java.yml"]
 
@@ -30,6 +31,6 @@
     - cp -R pb/. "${SERVICE_PATH}/${PROTO_DIR}/"
     - cd "${SERVICE_PATH}"
     - gradle --version
-    - gradle classes
+    - gradle shadowJar
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-java.yml"]
