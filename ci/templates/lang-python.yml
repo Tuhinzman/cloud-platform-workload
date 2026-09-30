@@ -1,6 +1,6 @@
 # The Dockerfile's own base image, so no new image is trusted. Neither service declares a linter
-# or ships tests, so this asserts only that every .py file compiles under the image's Python:
-# nothing about imports, types or behaviour.
+# or ships tests, so the static check asserts only that every .py file compiles under the image's
+# Python: nothing about imports, types or behaviour.
 
 .lang-python-template:
   stage: lint
@@ -15,5 +15,15 @@
     - test -s /tmp/py-files
     - cat /tmp/py-files
     - python -m py_compile - < /tmp/py-files
+    # pip cannot check a lock against requirements.txt, so the Dockerfile's venv steps run again
+    # under requirements.lock and the freeze must equal it; bootstrap exits 0 on its own pip
+    # failures, so the diff is the check. Without the export, the same steps regenerate the lock.
+    - apk add --no-cache gcc g++ linux-headers
+    - python -m venv /tmp/venv
+    - export PIP_CONSTRAINT="${PWD}/requirements.lock"
+    - /tmp/venv/bin/pip install --no-cache-dir -r requirements.txt
+    - /tmp/venv/bin/opentelemetry-bootstrap -a install
+    - /tmp/venv/bin/pip freeze > /tmp/frozen
+    - diff requirements.lock /tmp/frozen
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-python.yml"]

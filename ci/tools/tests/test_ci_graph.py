@@ -13,7 +13,6 @@ exist in a pipeline that does not also contain the blocking scan in front of it.
 import copy
 import glob
 import os
-import re
 import sys
 import unittest
 
@@ -376,18 +375,17 @@ class SourceDependencyGate(unittest.TestCase):
         self.assertTrue(any("scan-source" in e for e in errors), errors)
 
 
-EXACT_PIN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(\[[A-Za-z0-9._,-]+\])?==[A-Za-z0-9._+!]+")
-
-
 class LockBuildBinding(unittest.TestCase):
     """The source gate scans a lock file. These are the checks that keep the build from
     resolving something else, which would make the scan evidence for an artifact nobody
-    built. Both mechanisms were measured against the real toolchains before being asserted
-    here: NU1004 for NuGet, a non-zero composer validate for Composer."""
+    built. Each mechanism was measured against the real toolchain before being asserted
+    here: NU1004 for NuGet, a non-zero composer validate for Composer, and for pip a freeze
+    that no longer equals the lock."""
 
     LOCKFILES = {
         "nuget": "packages.lock.json",
         "composer": "composer.lock",
+        "pip": "requirements.lock",
     }
 
     def committed_lockfiles(self, filename):
@@ -414,12 +412,47 @@ class LockBuildBinding(unittest.TestCase):
         self.assertIn("composer validate", script)
         self.assertNotIn("--no-check-lock", script)
 
+    def test_python_tier_rebuilds_the_venv_under_the_lock(self):
+        """pip cannot check a lock against requirements.txt, so the tier repeats the image's venv
+        steps with the lock as PIP_CONSTRAINT and diffs the freeze. Measured on recommendation:
+        a lock missing one transitive pin, a requirements.txt adding a package, and a lock
+        pinning an instrumentation that bootstrap cannot then install each fail at the diff,
+        and bootstrap itself exited 0 on the last."""
+        script = self.tier_script("ci/templates/lang-python.yml", ".lang-python-template")
+        self.assertIn('export PIP_CONSTRAINT="${PWD}/requirements.lock"', script)
+        self.assertIn("pip install --no-cache-dir -r requirements.txt", script)
+        self.assertIn("opentelemetry-bootstrap -a install", script)
+        self.assertIn("pip freeze > /tmp/frozen", script)
+
+    def test_python_images_install_under_the_lock(self):
+        """The tier check proves the lock matches requirements.txt; only the constraint in the
+        Dockerfile makes the image install it. Without it pip takes the newest release of every
+        dependency requirements.txt does not pin, and the scan describes a set the image may
+        not hold."""
+        for svc in sorted(self.committed_lockfiles("requirements.lock")):
+            with self.subTest(service=svc):
+                text = open(os.path.join(ROOT, "services", svc, "Dockerfile")).read()
+                self.assertIn(f"COPY ./services/{svc}/requirements.lock requirements.lock", text)
+                self.assertIn("ENV PIP_CONSTRAINT=/requirements.lock", text)
+
+    def test_the_source_gate_reads_each_committed_pip_lock(self):
+        """Measured with the pinned scanner, Trivy's pip analyzer reads only files named
+        requirements.txt. Without the pattern the gate scans the manifest alone, which still
+        resolves enough packages to pass the coverage check."""
+        config = ci_graph.load_config(ROOT)
+        for svc in sorted(self.committed_lockfiles("requirements.lock")):
+            with self.subTest(service=svc):
+                variables = ci_graph.resolve(config, f"{svc}:scan-source").get("variables") or {}
+                self.assertEqual(variables.get("TRIVY_FILE_PATTERNS"), r"pip:requirements\.lock")
+
     def test_a_committed_lockfile_has_a_tier_that_enforces_it(self):
         """The pairing, stated once rather than per service: if a service commits an
         ecosystem lock file, that ecosystem's shared tier must enforce it."""
         enforced = {
             "nuget": ("ci/templates/lang-dotnet.yml", ".lang-dotnet-template", "--locked-mode"),
             "composer": ("ci/templates/lang-php.yml", ".lang-php-template", "composer validate"),
+            "pip": ("ci/templates/lang-python.yml", ".lang-python-template",
+                    "diff requirements.lock /tmp/frozen"),
         }
         for ecosystem, filename in self.LOCKFILES.items():
             services_with = self.committed_lockfiles(filename)
@@ -444,20 +477,15 @@ class LockBuildBinding(unittest.TestCase):
                 # One name per ecosystem the fleet actually uses. npm's file is
                 # package-lock.json, which a *.lock* pattern does not match, and this test
                 # failed on payment for exactly that reason the first time a Node service
-                # declared dependencies.
+                # declared dependencies. requirements.txt is pip's manifest, not a lock, even
+                # when every line is an exact pin: pip's is the verified freeze beside it.
                 names = ("package-lock.json", "packages.lock.json", "composer.lock",
                          "Cargo.lock", "go.sum", "poetry.lock", "Gemfile.lock", "mix.lock",
-                         "requirements.txt")
+                         "requirements.lock")
                 found = [m for name in names
                          for m in glob.glob(os.path.join(ROOT, "services", svc, "**", name), recursive=True)
                          if "node_modules" not in m and "/vendor/" not in m]
                 self.assertTrue(found, f"{svc} declares managed dependencies but commits no lock file")
-                # requirements.txt is the file the image installs, not a lock: it counts only while
-                # every line is an exact pin, because the scanner silently drops any other line.
-                for req in (m for m in found if m.endswith("requirements.txt")):
-                    loose = [line for line in (raw.split("#")[0].strip() for raw in open(req))
-                             if line and not EXACT_PIN.fullmatch(line)]
-                    self.assertEqual(loose, [], f"{req} carries requirements the source gate cannot see")
 
 
 HEALTH_TEMPLATE = ".image-health-template"

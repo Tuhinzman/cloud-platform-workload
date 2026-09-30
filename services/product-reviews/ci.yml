@@ -30,12 +30,14 @@ product-reviews:scan-image:
   variables:
     <<: *product-reviews-vars
 
-# requirements.txt pins direct dependencies only. Their transitive set and the instrumentation
-# opentelemetry-bootstrap adds at build time are unpinned, and only the image scan reads them.
+# Trivy's pip analyzer reads only files named requirements.txt, which lists the direct
+# dependencies alone; the pattern adds requirements.lock, the complete set pip and
+# opentelemetry-bootstrap install into the image.
 product-reviews:scan-source:
   extends: .trivy-source-scan-template
   variables:
     <<: *product-reviews-vars
+    TRIVY_FILE_PATTERNS: 'pip:requirements\.lock'
 
 # The database and LLM settings are required at startup but used only per request, so
 # placeholders let it listen alone. No real key or credential is set here.

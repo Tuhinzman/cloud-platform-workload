@@ -30,12 +30,14 @@ recommendation:scan-image:
   variables:
     <<: *recommendation-vars
 
-# requirements.txt pins direct dependencies only. Their transitive set and the instrumentation
-# opentelemetry-bootstrap adds at build time are unpinned, and only the image scan reads them.
+# Trivy's pip analyzer reads only files named requirements.txt, which lists the direct
+# dependencies alone; the pattern adds requirements.lock, the complete set pip and
+# opentelemetry-bootstrap install into the image.
 recommendation:scan-source:
   extends: .trivy-source-scan-template
   variables:
     <<: *recommendation-vars
+    TRIVY_FILE_PATTERNS: 'pip:requirements\.lock'
 
 recommendation:health-test:
   extends: .image-health-template

@@ -3,6 +3,10 @@
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout. Runtime base packages upgraded to pick up security fixes.
+# Change: requirements.lock copied into the venv stage and set as pip's constraint, so the
+# requirements install and opentelemetry-bootstrap both take the versions the source gate scans.
+# Upstream pins direct dependencies only; every other package resolves at build time to the
+# newest release its declared range allows.
 
 FROM docker.io/library/python:3.12-alpine3.22 AS build-venv
 
@@ -10,6 +14,9 @@ RUN apk update && \
     apk add gcc g++ linux-headers
 
 COPY ./services/product-reviews/requirements.txt requirements.txt
+COPY ./services/product-reviews/requirements.lock requirements.lock
+
+ENV PIP_CONSTRAINT=/requirements.lock
 
 RUN python -m venv venv && \
     venv/bin/pip install --no-cache-dir -r requirements.txt
