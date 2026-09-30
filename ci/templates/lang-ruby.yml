@@ -6,7 +6,7 @@
   stage: lint
   variables:
     SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
-  image: ruby:3.4.7-alpine3.22
+  image: ruby:3.4.11-alpine3.23
   script:
     - cd "${SERVICE_PATH}"
     - ruby -v
