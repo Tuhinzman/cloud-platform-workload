@@ -384,13 +384,13 @@ upstream-derived files differ in content: the twenty-two container definitions r
 modified above, plus the eleven the preceding section records. Those eleven are what
 separates this result from the twenty-two figure, which counts modified container
 definitions only. The remaining three hundred and nineteen upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Eleven files
+scope are byte-identical, and no upstream file in the scope is missing here. Thirteen files
 are present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
-`image-provider`, `cart`, and `currency`, and `services/frontend/eslint.config.mjs`. Those
-eleven are
-project-added configuration with no upstream origin, so no modification notice applies
-to them. The flat ESLint configuration is project-added rather than a modification
+`image-provider`, `cart`, and `currency`; `services/frontend/eslint.config.mjs`; and two lock
+files, `services/cart/src/packages.lock.json` and `services/quote/composer.lock`, which exist so
+the source gate has a declared dependency set to read. Those thirteen are project-added with no
+upstream origin, so no modification notice applies to them. The flat ESLint configuration is project-added rather than a modification
 because ESLint 9 reads flat configuration only and upstream ships none; the upstream
 `.eslintrc` beside it is retained unmodified and still counts among the byte-identical
 files.
