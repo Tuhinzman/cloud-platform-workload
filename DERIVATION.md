@@ -121,10 +121,10 @@ the pipeline harder to share than the problem it solves.
 
 ### Modified upstream files that are not container definitions
 
-The table above covers container definitions. Eighteen upstream-derived files under
+The table above covers container definitions. Twenty upstream-derived files under
 `services/checkout/`, `services/product-catalog/`, `services/shipping/`,
-`services/quote/`, `services/frontend/`, `services/payment/`, and `services/cart/` also differ
-from the pinned source, and they
+`services/quote/`, `services/frontend/`, `services/payment/`, `services/cart/`, and
+`services/email/` also differ from the pinned source, and they
 are recorded here so the modification inventory is not limited to container definitions. Those applications remain
 upstream work. What follows are corrections and dependency movement applied on top of them,
 not authorship of the services.
@@ -149,22 +149,27 @@ not authorship of the services.
 | `services/payment/package.json` | Dependency metadata | `d2f3481` moved three direct pins: `@grpc/grpc-js` from `1.12.6` to `1.12.7`, `@opentelemetry/auto-instrumentations-node` from `0.67.3` to `0.78.0` and `@opentelemetry/sdk-node` from `0.208.0` to `0.220.0`. A later change moved `@grpc/grpc-js` to `1.13.6` for CVE-2026-101916 and `@openfeature/flagd-provider` from `0.13.3` to `0.13.4`, the first release whose peer range admits it. |
 | `services/payment/package-lock.json` | Dependency lock metadata | Re-resolved by npm for those pins, in `d2f3481`, and again for the later ones, which move two entries and add or remove none. |
 | `services/cart/src/cart.csproj` | Dependency metadata | `30c556a` moved `OpenTelemetry.Resources.Host` from `1.14.0-beta.1` to `1.16.0-beta.2`, the first published version carrying the fix for GHSA-v8pv-4842-x354, and changed nothing else. |
+| `services/email/Gemfile.lock` | Dependency metadata | Four gems moved within the unchanged `Gemfile` constraints to clear the HIGH and CRITICAL findings both scan gates reported: rack 3.1.15 to 3.1.22, rack-session 2.1.1 to 2.1.2, net-imap 0.5.8 to 0.5.15 and puma 7.1.0 to 7.2.1, resolved with `bundle update --conservative` under the locked Bundler 2.6.7. |
+| `services/email/.ruby-version` | Toolchain metadata | 3.4.7 to 3.4.11, matching the container definition's move to the first 3.4 release whose bundled gems carry the fixes. |
 
 Every dependency change above was made to move off modules a scan reported findings against:
 the image scan, which is the reason recorded in `a384c3d`, `bf07e2e`, `14d12f3`, and `1b4deb0`;
 the source gate, which is the reason recorded in `0463437`, `94eeedf`, `d2f3481`, and
-`30c556a`; and both gates for the later frontend and payment moves. Neither the changes nor
-this record claims any review of those dependencies beyond that.
+`30c556a`; both gates for the later frontend and payment moves; and both scan gates for the
+`services/email/` changes. Neither the changes nor this record claims any review of those
+dependencies beyond that.
 
 Both `main.go` files, `shipping_service.rs`, the five `services/frontend/` source files and
 `cart.csproj` above carry an Apache-2.0 modification notice in the format described below.
-The `go.mod` and `go.sum` files, `composer.json`, and the `package.json` and
-`package-lock.json` files carry none, and none is added. `go.sum` is a line-oriented checksum
-list with no comment syntax, and the others apart from `go.mod` are strict JSON, which rejects
-comments outright, so none of them can hold one. `go.mod` does support `//` comments, but
-neither copy carries an upstream copyright or licence header for a notice to sit beneath, and
-both are dependency metadata maintained by the Go toolchain rather than authored source. This
-table is the record of their modification.
+The `go.mod` and `go.sum` files, `composer.json`, the `package.json` and `package-lock.json`
+files, `Gemfile.lock` and `.ruby-version` carry none, and none is added. `Gemfile.lock` is
+rewritten whole by Bundler and `.ruby-version` holds a single version string, so neither can
+hold one. `go.sum` is a line-oriented checksum list with no comment syntax, and
+`composer.json`, `package.json` and `package-lock.json` are strict JSON, which rejects comments
+outright, so none of them can hold one. `go.mod` does support `//` comments, but neither copy
+carries an upstream copyright or licence header for a notice to sit beneath, and both are
+dependency metadata maintained by the Go toolchain rather than authored source. This table is
+the record of their modification.
 
 ### Hardening applied, by component
 
@@ -172,7 +177,7 @@ table is the record of their modification.
 |---|---|
 | cart | Base packages upgraded, application files owned by the built-in unprivileged user, container runs as that user |
 | currency | Default pinned OpenTelemetry C++ version, dedicated unprivileged user, entrypoint corrected to an absolute path |
-| email | Base packages upgraded |
+| email | Base packages upgraded, Ruby moved from 3.4.7 on Alpine 3.22 to 3.4.11 on Alpine 3.23, the first 3.4 release whose bundled gems carry the fixes the scan gates require |
 | flagd-ui | Runtime base moved to Debian bookworm, newer OTP, packages upgraded, ncurses moved to the supported major version |
 | image-provider | Packages upgraded in a temporary privileged stage, served content given explicit ownership and read permissions, returns to the unprivileged nginx user |
 | frontend | Runtime base moved from `nodejs22-debian12` to `nodejs22-debian13` and pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
@@ -228,13 +233,13 @@ base images.
 | Java | ad, fraud-detection | `build.gradle`, `build.gradle.kts` | Net-new |
 | Python | product-reviews, recommendation | `requirements.txt` | `ci/templates/lang-python.yml`, net-new |
 | Rust | shipping | `Cargo.toml` | `ci/templates/lang-rust.yml` |
-| Ruby | email | `Gemfile` | Net-new |
+| Ruby | email | `Gemfile` | `ci/templates/lang-ruby.yml`, net-new |
 | PHP | quote | `composer.json` | `ci/templates/lang-php.yml` |
 | C++ | currency | `CMakeLists.txt` | `ci/templates/lang-cpp.yml`, net-new |
 | Elixir | flagd-ui | `mix.exs` | Net-new |
 
-Seven tiers of ten have a template today. The other three have none. ADR-0017 selects the
-full justified project-built inventory as the programme target, so those three tiers are
+Eight tiers of ten have a template today. The other two have none. ADR-0017 selects the
+full justified project-built inventory as the programme target, so those two tiers are
 selected work; no schedule for them is claimed here.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
@@ -321,7 +326,7 @@ has no repository in the platform registry, as `currency` does not, its publish 
 jobs stay unwired rather than pointing somewhere wrong. It is still wired through build and
 scan, because neither stage touches the registry.
 
-Five components have no per-service configuration. Four of them have a language tier with
+Four components have no per-service configuration. Three of them have a language tier with
 no template; accounting is the exception, because the .NET tier now has one and accounting
 is not yet wired to it. `frontend-proxy` and `image-provider` have no application
 language, and each carries a per-service `ci.yml` regardless, because a container
@@ -332,16 +337,17 @@ that declares `SERVICE_DOCKERFILE`, because cart is the only component whose con
 definition is not at its service root. `services/currency/ci.yml` and the C++ tier template
 it extends, `ci/templates/lang-cpp.yml`, are net-new as well, as are
 `services/product-reviews/ci.yml`, `services/recommendation/ci.yml` and the Python tier
-template they extend, `ci/templates/lang-python.yml`.
+template they extend, `ci/templates/lang-python.yml`, and `services/email/ci.yml` with the Ruby
+tier template, `ci/templates/lang-ruby.yml`.
 
 ### Not implemented
 
 ADR-0017 selects the full justified project-built inventory as the target of an
-owner-selected end-to-end programme. Selection is not delivery, and .NET, C++ and Python are the
-only tiers of that breadth implemented so far, so the following are recorded as not
+owner-selected end-to-end programme. Selection is not delivery, and .NET, C++, Python and Ruby
+are the only tiers of that breadth implemented so far, so the following are recorded as not
 implemented:
 
-- Language-tier templates for Java, Ruby, and Elixir.
+- Language-tier templates for Java and Elixir.
 - Image size budgets.
 
 Net-new and now implemented, executed for checkout, shipping and quote, and since then for image-provider:
@@ -397,19 +403,19 @@ git show 2.2.0:LICENSE > ../out/LICENSE
 ```
 
 The comparison scope is `services/`, `pb/`, and `LICENSE`. Within that scope, comparing
-`../out` against this tree reports two kinds of difference and nothing else. Forty
+`../out` against this tree reports two kinds of difference and nothing else. Forty-two
 upstream-derived files differ in content: the twenty-two container definitions recorded as
-modified above, plus the eighteen the preceding section records. Those eighteen are what
+modified above, plus the twenty the preceding section records. Those twenty are what
 separates this result from the twenty-two figure, which counts modified container
-definitions only. The remaining three hundred and twelve upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Seventeen files
+definitions only. The remaining three hundred and ten upstream-derived files in the
+scope are byte-identical, and no upstream file in the scope is missing here. Eighteen files
 are present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
-`image-provider`, `cart`, `currency`, `product-reviews`, and `recommendation`;
+`image-provider`, `cart`, `currency`, `product-reviews`, `recommendation`, and `email`;
 `services/frontend/eslint.config.mjs`; and four lock files, `services/cart/src/packages.lock.json`,
 `services/quote/composer.lock` and the pip-generated `requirements.lock` under
 `services/product-reviews` and `services/recommendation`, which exist so the source gate has a
-declared dependency set to read. Those seventeen are project-added with no upstream origin, so
+declared dependency set to read. Those eighteen are project-added with no upstream origin, so
 no modification notice applies to them. The flat ESLint configuration is project-added rather
 than a modification because ESLint 9 reads flat configuration only and upstream ships none; the upstream
 `.eslintrc` beside it is retained unmodified and still counts among the byte-identical
@@ -423,6 +429,6 @@ container definitions, `services/checkout/main.go`, `services/product-catalog/ma
 `services/shipping/src/shipping_service.rs`, the five modified `services/frontend/` source
 files, and `services/cart/src/cart.csproj`. Every one of them that differs carries a
 modification notice, and every one carrying a notice differs. The `go.mod`, `go.sum`,
-`composer.json`, `package.json` and `package-lock.json` files are excluded for the reason
-given in the preceding section, and the table there is what records them. That correspondence is the check worth running, because it
+`composer.json`, `package.json`, `package-lock.json`, `Gemfile.lock` and `.ruby-version` files
+are excluded for the reason given in the preceding section, and the table there is what records them. That correspondence is the check worth running, because it
 fails loudly if a change is made without recording it.

@@ -22,11 +22,11 @@ bounded startup and static-asset result, not a check of any backend call it woul
 than an exception: it binds its gRPC port before anything external is needed. What that
 does not cover is recorded with it - the Charge handler reaches flagd per request, so the
 application path beyond the health service is not validated in CI.
-currency, product-reviews and recommendation carry build, both security gates, SBOM and
-container health with no publication stage. Evidence for the remaining five components is
-unpopulated until the corresponding implementation and validation have actually occurred.
-Wiring is not execution, publication is not runtime evidence, and none of this is fleet-wide
-delivery: five components have no pipeline configuration at all. Identity and classification are facts
+currency, product-reviews, recommendation and email carry build, both security gates, SBOM
+and container health with no publication stage. Evidence for the remaining four components
+is unpopulated until the corresponding implementation and validation have actually
+occurred. Wiring is not execution, publication is not runtime evidence, and none of this is
+fleet-wide delivery: four components have no pipeline configuration at all. Identity and classification are facts
 about the source and are populated independently of that evidence.
 
 Five classes. Every component belongs to exactly one, and the class decides what evidence
@@ -68,19 +68,19 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | Java | ad, fraud-detection | Net-new |
 | Python | product-reviews, recommendation | `ci/templates/lang-python.yml`, net-new |
 | Rust | shipping | `ci/templates/lang-rust.yml`, net-new |
-| Ruby | email | Net-new |
+| Ruby | email | `ci/templates/lang-ruby.yml`, net-new |
 | PHP | quote | `ci/templates/lang-php.yml`, net-new |
 | C++ | currency | `ci/templates/lang-cpp.yml`, net-new |
 | Elixir | flagd-ui | Net-new |
 
-Seven tiers of ten have a template today. Ten services are wired to the pipeline. Five are
-not: four because their tier has no template, and accounting because its .NET tier has one
-and it has not been wired to it. Twelve components are wired in total, the two configured
-components in section 2 included. ADR-0017 selects the full justified project-built
-inventory as the target of an owner-selected end-to-end programme, so the remaining three
-tiers are selected work rather than work ruled out. .NET was the first of the six to be
-implemented, C++ the second and Python the third, and nothing here says those components
-are delivered.
+Eight tiers of ten have a template today. Eleven services are wired to the pipeline. Four
+are not: three because their tier has no template, and accounting because its .NET tier has
+one and it has not been wired to it. Thirteen components are wired in total, the two
+configured components in section 2 included. ADR-0017 selects the full justified
+project-built inventory as the target of an owner-selected end-to-end programme, so the
+remaining two tiers are selected work rather than work ruled out. .NET was the first of the
+six to be implemented, C++ the second, Python the third and Ruby the fourth, and nothing
+here says those components are delivered.
 
 ## 2. Project-Built Configured Components
 
@@ -140,7 +140,7 @@ exception. It simply does not run.
 
 ## Container Health Disposition
 
-All twelve wired components prove container health in CI. Two reach their listening state
+All thirteen wired components prove container health in CI. Two reach their listening state
 only after a startup dependency answers, so their health job starts that dependency beside
 them as a digest-pinned fixture on a job-private network. That proves the image starts
 against the dependency it needs; it is not runtime readiness, and the readiness obligation
@@ -156,7 +156,7 @@ product-catalog's managed database are separate decisions.
 
 | Component | Container health |
 |---|---|
-| checkout, quote, shipping, frontend-proxy, image-provider, payment, frontend, currency, product-reviews, recommendation | validated in CI |
+| checkout, quote, shipping, frontend-proxy, image-provider, payment, frontend, currency, product-reviews, recommendation, email | validated in CI |
 | cart | validated in CI against an ephemeral fixture: Valkey 9.0.1 from the upstream chart, because `Program.cs:98` resolves ValkeyCartStore before `app.Run()` and `ValkeyCartStore.cs:101` throws without it |
 | product-catalog | validated in CI against an ephemeral fixture: PostgreSQL 17.11, the Dev datastore's engine version, with trust authentication and no schema, because `main()` calls `initDatabase()` before the listener and exits 1 without it |
 
@@ -183,8 +183,9 @@ varies by language rather than by packaging. Measured at the current anchor:
 | currency | C++ | none: OS packages only; the compiled-in opentelemetry-cpp is not visible | none, declared |
 | product-reviews | Python | 62, from the installed venv and the base image's pip | 71: 60 from `requirements.lock`, 11 from `requirements.txt` |
 | recommendation | Python | 40, from the installed venv and the base image's pip | 46: 38 from `requirements.lock`, 8 from `requirements.txt` |
+| email | Ruby | the bundle's gems and the gems shipped with Ruby, read from their gemspecs | 90, from `Gemfile.lock` |
 
-Three of the twelve carry no managed dependency into the image at all. For shipping and cart
+Three of the thirteen carry no managed dependency into the image at all. For shipping and cart
 the source pass is the only dependency coverage there is; currency has neither:
 opentelemetry-cpp is cloned at a release tag and compiled into the image, and neither scan
 reads it. product-reviews and recommendation install under a pip-generated
@@ -213,10 +214,10 @@ reported and not hidden.
 Sixteen items. No component carries the full set: checkout, shipping and quote carry
 most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
 items but none of the runtime ones, frontend-proxy carries its pipeline configuration
-alone, cart, payment, frontend, product-catalog, currency, product-reviews and
-recommendation each carry their pipeline configuration and an executed build, both security
-gates and an SBOM with no publication or runtime behind them, and the remaining five
-components carry none.
+alone, cart, payment, frontend, product-catalog, currency, product-reviews, recommendation
+and email each carry their pipeline configuration and an executed build, both security gates
+and an SBOM with no publication or runtime behind them, and the remaining four components
+carry none.
 Upstream or external image origin, classification, modification record, container
 definition or image source, reusable pipeline configuration where project-built, build
 result where project-built, current scan result, SBOM where project-built, registry digest,
