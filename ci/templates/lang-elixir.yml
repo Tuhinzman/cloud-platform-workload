@@ -1,0 +1,38 @@
+# The Dockerfile's builder image, so no new image is trusted. The image build fetches without a
+# lock check, so this job is what binds the mix.lock the source gate scans to what gets built.
+# MIX_ENV matches the image build, so a compile pass here predicts the image's compile.
+
+.lang-elixir-template:
+  stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+    MIX_ENV: prod
+  image: hexpm/elixir:1.19.3-erlang-28.1.1-debian-bookworm-20251117-slim
+  script:
+    # The slim image has no git, which the lock's git dependency needs; the builder installs it too.
+    - apt-get update && apt-get install -y --no-install-recommends git
+    - cd "${SERVICE_PATH}"
+    - elixir --version
+    - mix local.hex --force && mix local.rebar --force
+    # Without --check-locked, a mix.exs change or a missing lock entry is written into mix.lock
+    # and the fetch exits 0.
+    - mix deps.get --check-locked
+    - mix compile
+    - mix format --check-formatted
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-elixir.yml"]
+
+# Separate from the lint template so a service opts in only where tests actually exist.
+.lang-elixir-test-template:
+  stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+  image: hexpm/elixir:1.19.3-erlang-28.1.1-debian-bookworm-20251117-slim
+  script:
+    - apt-get update && apt-get install -y --no-install-recommends git
+    - cd "${SERVICE_PATH}"
+    - mix local.hex --force && mix local.rebar --force
+    - mix deps.get --check-locked
+    - mix test
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-elixir.yml"]

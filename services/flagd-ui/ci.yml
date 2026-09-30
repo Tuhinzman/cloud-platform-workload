@@ -1,0 +1,54 @@
+# Declarative configuration for flagd-ui; behaviour lives in ci/templates. No publish or
+# evidence job: flagd-ui has no ECR repository and none is authorized.
+
+.flagd-ui-vars: &flagd-ui-vars
+  SERVICE_NAME: flagd-ui
+  SERVICE_PATH: services/flagd-ui
+  LANG_TIER: elixir
+
+flagd-ui:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *flagd-ui-vars
+
+flagd-ui:lint-elixir:
+  extends: .lang-elixir-template
+  variables:
+    <<: *flagd-ui-vars
+
+# No test job although upstream ships tests: config/test.exs:30 points the store at
+# test/fixtures/demo.flagd.json, which the repository does not contain, so mix test fails
+# at application start before any test runs.
+
+flagd-ui:build:
+  extends: .image-build-template
+  variables:
+    <<: *flagd-ui-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+flagd-ui:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - flagd-ui:build
+  variables:
+    <<: *flagd-ui-vars
+
+# The image scan reads Debian packages only, not the Hex dependencies or the Erlang runtime
+# and OTP applications the release bundles. This is the only scan of the Hex set; the bundled
+# OTP is seen by neither.
+flagd-ui:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *flagd-ui-vars
+
+flagd-ui:health-test:
+  extends: .image-health-template
+  dependencies: []
+  variables:
+    <<: *flagd-ui-vars
+    HEALTH_MODE: deferred-to-runtime
+    HEALTH_REASON: >-
+      application.ex:20 starts FlagdUi.Storage before the endpoint and storage.ex:23 reads
+      /app/data/demo.flagd.json (prod.exs:22) with File.read!, so without the flag file the
+      flagd pod mounts at runtime the release exits 1 and Bandit never listens

@@ -380,14 +380,16 @@ class LockBuildBinding(unittest.TestCase):
     resolving something else, which would make the scan evidence for an artifact nobody
     built. Each mechanism was measured against the real toolchain before being asserted
     here: NU1004 for NuGet, a non-zero composer validate for Composer, for pip a freeze that
-    no longer equals the lock, and exit 16 from a frozen bundle install for Bundler (a changed
-    or added Gemfile entry, or no Gemfile.lock at all)."""
+    no longer equals the lock, exit 16 from a frozen bundle install for Bundler (a changed or
+    added Gemfile entry, or no Gemfile.lock at all), and for Mix a deps.get --check-locked that
+    exits 1 where a plain deps.get rewrites mix.lock and exits 0."""
 
     LOCKFILES = {
         "nuget": "packages.lock.json",
         "composer": "composer.lock",
         "pip": "requirements.lock",
         "bundler": "Gemfile.lock",
+        "mix": "mix.lock",
     }
 
     def committed_lockfiles(self, filename):
@@ -457,6 +459,8 @@ class LockBuildBinding(unittest.TestCase):
                     "diff requirements.lock /tmp/frozen"),
             "bundler": ("ci/templates/lang-ruby.yml", ".lang-ruby-template",
                         "BUNDLE_FROZEN=true bundle install"),
+            "mix": ("ci/templates/lang-elixir.yml", ".lang-elixir-template",
+                    "mix deps.get --check-locked"),
         }
         for ecosystem, filename in self.LOCKFILES.items():
             services_with = self.committed_lockfiles(filename)
@@ -575,10 +579,11 @@ class DeferredHealth(unittest.TestCase):
 
     def test_the_deferred_set_is_the_measured_one_only(self):
         """Deferring is a claim about a service, not a way past a failing probe. cart and
-        product-catalog left it once a startup fixture made their probe real."""
+        product-catalog left it once a startup fixture made their probe real; flagd-ui was
+        measured exiting 1 at startup without the flag file its pod mounts."""
         config = ci_graph.load_config(ROOT)
         deferred = {j.split(":")[0] for j in health_jobs() if health_mode(config, j) == DEFERRED}
-        self.assertEqual(deferred, set())
+        self.assertEqual(deferred, {"flagd-ui"})
 
     def test_every_built_service_declares_a_health_job(self):
         built = {job.split(":")[0] for job in jobs_extending(".image-build-template")}
