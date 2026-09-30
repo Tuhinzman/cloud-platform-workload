@@ -43,12 +43,15 @@ accounting:scan-source:
   variables:
     <<: *accounting-vars
 
+# A Kafka consumer that never listens (Program.cs:14 builds a host with no server and
+# Consumer.cs:66 blocks in the consume loop), so the running mode applies. Without KAFKA_ADDR
+# Consumer.cs:42 throws and the process exits; an unresolvable broker only makes it retry.
 accounting:health-test:
   extends: .image-health-template
-  dependencies: []
+  dependencies:
+    - accounting:build
   variables:
     <<: *accounting-vars
-    HEALTH_MODE: deferred-to-runtime
-    HEALTH_REASON: >-
-      no port to probe: Program.cs:14 builds a host with no server and Program.cs:22 blocks
-      in the Kafka consume loop at Consumer.cs:66; measured Running at 60s, zero listening sockets
+    HEALTH_MODE: running
+    HEALTH_ENV: >-
+      -e KAFKA_ADDR=kafka.invalid:9092

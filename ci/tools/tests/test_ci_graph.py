@@ -542,8 +542,8 @@ def run_dispatch(**env):
 
 
 class DeferredHealth(unittest.TestCase):
-    """A service that listens only once a dependency exists, or never listens, must say so
-    rather than silently omit the stage. Recording the deferral is not a health result."""
+    """A service that cannot listen until a dependency exists must say so rather than
+    silently omit the stage. Recording the deferral is not a health result."""
 
     def test_deferred_mode_requires_a_reason(self):
         config = ci_graph.load_config(ROOT)
@@ -593,7 +593,7 @@ class DeferredHealth(unittest.TestCase):
         listen would hide a failing probe, so each user is a recorded decision."""
         config = ci_graph.load_config(ROOT)
         running = {j.split(":")[0] for j in health_jobs() if health_mode(config, j) == RUNNING}
-        self.assertEqual(running, {"fraud-detection"})
+        self.assertEqual(running, {"fraud-detection", "accounting"})
 
     def test_the_deferred_set_is_the_measured_one_only(self):
         """Deferring is a claim about a service, not a way past a failing probe. cart and
@@ -601,7 +601,7 @@ class DeferredHealth(unittest.TestCase):
         measured exiting 1 at startup without the flag file its pod mounts."""
         config = ci_graph.load_config(ROOT)
         deferred = {j.split(":")[0] for j in health_jobs() if health_mode(config, j) == DEFERRED}
-        self.assertEqual(deferred, {"flagd-ui", "accounting"})
+        self.assertEqual(deferred, {"flagd-ui"})
 
     def test_every_built_service_declares_a_health_job(self):
         built = {job.split(":")[0] for job in jobs_extending(".image-build-template")}
