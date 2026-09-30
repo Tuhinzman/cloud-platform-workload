@@ -89,13 +89,13 @@ exactly as upstream wrote them.
 | `services/checkout/genproto/Dockerfile` | checkout | Path-only modified |
 | `services/currency/genproto/Dockerfile` | currency | Path-only modified |
 | `services/fraud-detection/Dockerfile` | fraud-detection | Path-only modified |
-| **`services/frontend/Dockerfile`** | **frontend** | **Path-only modified** |
+| **`services/frontend/Dockerfile`** | **frontend** | **Path plus hardening** |
 | `services/frontend/genproto/Dockerfile` | frontend | Path-only modified |
 | `services/frontend/Dockerfile.cypress` | frontend | Path-only modified |
 | **`services/product-catalog/Dockerfile`** | **product-catalog** | **Path-only modified** |
 | `services/product-catalog/genproto/Dockerfile` | product-catalog | Path-only modified |
 | `services/quote/Dockerfile` | quote | Path plus hardening |
-| `services/shipping/Dockerfile` | shipping | Path-only modified |
+| `services/shipping/Dockerfile` | shipping | Path plus hardening |
 | `services/product-reviews/genproto/Dockerfile` | product-reviews | Upstream unchanged |
 | `services/recommendation/genproto/Dockerfile` | recommendation | Upstream unchanged |
 | `services/cart/src/Dockerfile` | cart | Path plus hardening |
@@ -113,7 +113,7 @@ One change to `services/accounting/Dockerfile` was reviewed and rejected. The fi
 retained and appears once above, as path-only modified. The rejection is recorded under
 rejected modifications below.
 
-`frontend` and `product-catalog` carry the path change only. The prior bare-metal project
+`frontend` and `product-catalog` keep the root build context. The prior bare-metal project
 had adapted both to a per-service build context, dropping the `./src/<name>/` prefix
 entirely. That adaptation is not carried, because it does not work for the seven components
 that copy from `pb/`, and using two different context models across one fleet would make
@@ -175,10 +175,12 @@ table is the record of their modification.
 | email | Base packages upgraded |
 | flagd-ui | Runtime base moved to Debian bookworm, newer OTP, packages upgraded, ncurses moved to the supported major version |
 | image-provider | Packages upgraded in a temporary privileged stage, served content given explicit ownership and read permissions, returns to the unprivileged nginx user |
-| payment | Application files and dependencies owned by the unprivileged runtime user |
+| frontend | Runtime base moved from `nodejs22-debian12` to `nodejs22-debian13` and pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
+| payment | Application files and dependencies owned by the unprivileged runtime user; runtime base moved from `nodejs22-debian12` to `nodejs22-debian13` and pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
 | product-reviews | Base packages upgraded |
 | quote | Runtime base moved from `php:8.4-cli-alpine3.22`, which is no longer rebuilt, to `php:8.4-cli-alpine3.23` pinned by digest, whose own packages carry the fixes the image scan requires; extension installer raised to 2.9.22, pinned by digest, for Alpine 3.23 support |
 | recommendation | TLS libraries upgraded, application directories given explicit read permissions |
+| shipping | Runtime base pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
 | frontend-proxy | Base image pinned to an immutable digest, package installation narrowed, TLS libraries added, configuration template given explicit ownership and read-only permissions |
 
 ### Rejected modifications

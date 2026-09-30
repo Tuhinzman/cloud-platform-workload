@@ -48,13 +48,13 @@ hardening, the pipeline, and the evidence.
 | email | Ruby | `src/email` | Path plus hardening | None |
 | flagd-ui | Elixir | `src/flagd-ui` | Path plus hardening | Unit and controller, seven files |
 | fraud-detection | Java | `src/fraud-detection` | Path-only modified | None |
-| frontend | Node | `src/frontend` | Path-only modified | Cypress harness configuration |
+| frontend | Node | `src/frontend` | Path plus hardening | Cypress harness configuration |
 | payment | Node | `src/payment` | Path plus hardening | None |
 | product-catalog | Go | `src/product-catalog` | Path-only modified | None |
 | product-reviews | Python | `src/product-reviews` | Path plus hardening | None |
 | quote | PHP | `src/quote` | Path plus hardening | None |
 | recommendation | Python | `src/recommendation` | Path plus hardening | None |
-| shipping | Rust | `src/shipping` | Path-only modified | None |
+| shipping | Rust | `src/shipping` | Path plus hardening | None |
 
 ### Language tiers
 
