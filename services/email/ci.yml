@@ -1,0 +1,52 @@
+# Declarative configuration for email; behaviour lives in ci/templates. No publish or evidence
+# job: email has no ECR repository and none is authorized. No test job: email ships no tests
+# and its Gemfile declares no test runner.
+
+.email-vars: &email-vars
+  SERVICE_NAME: email
+  SERVICE_PATH: services/email
+  LANG_TIER: ruby
+
+email:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *email-vars
+
+email:lint-ruby:
+  extends: .lang-ruby-template
+  variables:
+    <<: *email-vars
+
+email:build:
+  extends: .image-build-template
+  variables:
+    <<: *email-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+email:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - email:build
+  variables:
+    <<: *email-vars
+
+# The image scan sees the installed gems; this pass reads Gemfile.lock, which the lint job
+# holds the build to.
+email:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *email-vars
+
+# EMAIL_PORT is read at email_server.rb:18. Without APP_ENV Sinatra runs as development and
+# binds localhost only, which the port check cannot reach; production is what the chart sets.
+email:health-test:
+  extends: .image-health-template
+  dependencies:
+    - email:build
+  variables:
+    <<: *email-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e EMAIL_PORT=8080
+      -e APP_ENV=production

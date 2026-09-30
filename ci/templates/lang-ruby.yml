@@ -1,0 +1,23 @@
+# The Dockerfile's builder image, so no new image is trusted. The Gemfile declares no linter or
+# test runner, so ruby -c is the only static check of the service's code; it does not see ERB
+# views, which compile only when a request renders them.
+
+.lang-ruby-template:
+  stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+  image: ruby:3.4.7-alpine3.22
+  script:
+    - cd "${SERVICE_PATH}"
+    - ruby -v
+    # ruby -c checks only its first argument, hence -n1; an empty list fails instead of passing.
+    - find . -name '*.rb' -print0 > /tmp/rb-files
+    - test -s /tmp/rb-files
+    - xargs -0 -n1 ruby -c < /tmp/rb-files
+    # The builder stage's packages, which the locked gems' native extensions need.
+    - apk add --no-cache make gcc musl-dev gcompat
+    # Frozen fails when Gemfile and Gemfile.lock disagree; the image's plain bundle install would
+    # re-resolve and exit 0, so the lock the source gate scans would no longer be what ships.
+    - BUNDLE_FROZEN=true bundle install
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-ruby.yml"]

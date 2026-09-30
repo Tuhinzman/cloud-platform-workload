@@ -379,13 +379,15 @@ class LockBuildBinding(unittest.TestCase):
     """The source gate scans a lock file. These are the checks that keep the build from
     resolving something else, which would make the scan evidence for an artifact nobody
     built. Each mechanism was measured against the real toolchain before being asserted
-    here: NU1004 for NuGet, a non-zero composer validate for Composer, and for pip a freeze
-    that no longer equals the lock."""
+    here: NU1004 for NuGet, a non-zero composer validate for Composer, for pip a freeze that
+    no longer equals the lock, and exit 16 from a frozen bundle install for Bundler (a changed
+    or added Gemfile entry, or no Gemfile.lock at all)."""
 
     LOCKFILES = {
         "nuget": "packages.lock.json",
         "composer": "composer.lock",
         "pip": "requirements.lock",
+        "bundler": "Gemfile.lock",
     }
 
     def committed_lockfiles(self, filename):
@@ -453,6 +455,8 @@ class LockBuildBinding(unittest.TestCase):
             "composer": ("ci/templates/lang-php.yml", ".lang-php-template", "composer validate"),
             "pip": ("ci/templates/lang-python.yml", ".lang-python-template",
                     "diff requirements.lock /tmp/frozen"),
+            "bundler": ("ci/templates/lang-ruby.yml", ".lang-ruby-template",
+                        "BUNDLE_FROZEN=true bundle install"),
         }
         for ecosystem, filename in self.LOCKFILES.items():
             services_with = self.committed_lockfiles(filename)
