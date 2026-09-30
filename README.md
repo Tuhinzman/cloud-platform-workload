@@ -47,15 +47,14 @@ Twenty-two container definitions are modified, each carrying an Apache-2.0 modif
 notice. They are adapted deliberately, for this repository's build layout and for the
 platform work this workload exists to exercise.
 
-Beyond those, `checkout` and `product-catalog` carry project modifications to their
-application source and their Go dependency metadata, `shipping` to its application source,
-`quote`, `payment`, `cart` and `flagd-ui` to their dependency metadata, `email` to its
-dependency and Ruby version metadata, `ad` and `fraud-detection` to their Gradle build
-scripts, and `frontend` to five application-source files and its npm dependency metadata.
-Every other upstream-derived file in the compared scope, including all remaining application
-source and the protobuf contract, is byte-identical to the pinned upstream release. That
-scope is `services/`, `pb/` and `LICENSE`, and the comparison makes no claim about files
-outside it.
+Beyond those, `checkout` and `product-catalog` carry project modifications to their application
+source and their Go dependency metadata, `shipping` to its application source, `quote`,
+`payment`, `cart`, `flagd-ui` and `accounting` to their dependency metadata, `email` to its
+dependency and Ruby version metadata, `ad` and `fraud-detection` to their Gradle build scripts,
+and `frontend` to five application-source files and its npm dependency metadata. Every other
+upstream-derived file in the compared scope, including all remaining application source and the
+protobuf contract, is byte-identical to the pinned upstream release. That scope is `services/`,
+`pb/` and `LICENSE`, and the comparison makes no claim about files outside it.
 
 Upstream wrote this application and none of it is claimed as this project's work.
 [DERIVATION.md](DERIVATION.md) is the per-file record of what differs and how to reproduce
@@ -93,7 +92,11 @@ under strict dependency locking, build, and image and source scans, with no publ
 stage; upstream ships no tests for either. ad's container health is validated in CI.
 fraud-detection is a Kafka consumer that never listens, so its job proves only that the
 process stays running for a bounded time beside a control that aborts itself at once, which
-is not functional health.
+is not functional health. accounting is wired through the shared templates for Dockerfile
+lint, .NET lint, build, and image and source scans, with no publication stage; upstream ships
+no tests for it. Its .NET lint job first copies the shared contract to the path its project
+file compiles, the pipeline's one service-local step. accounting is a Kafka consumer too, and
+its running check is the same bounded, non-functional result.
 The product-catalog Go lint job is now configured as blocking and its latest
 validated run reports no findings. payment declares no linter and no TypeScript, so it
 extends a Node parse check rather than a lint, which asserts only that every `.js` file
@@ -109,12 +112,11 @@ image-provider has since completed the same stages. Two of those publications al
 pipeline retain the provenance itself, shipping first and then image-provider: each bundle
 keeps the registry manifest bytes whose sha256 is the published digest. frontend-proxy is
 wired for those stages and has published nothing, and cart is wired through scan with no
-publication stage, because no registry repository is declared for it. Those stages are not
-evidenced fleet-wide and accounting has no pipeline configuration at all. ADR-0017 now
-selects the full justified project-built inventory as the target of an owner-selected
-end-to-end programme, so accounting is selected work rather than work ruled out; selecting
-it is not delivering it, and promotion remains a separate implementation and validation
-obligation.
+publication stage, because no registry repository is declared for it. Every project-built
+component now has pipeline configuration, but those stages are not evidenced fleet-wide.
+ADR-0017 selects the full justified project-built inventory as the target of an
+owner-selected end-to-end programme; selecting it is not delivering it, and promotion remains
+a separate implementation and validation obligation.
 
 ## Licence and Attribution
 

@@ -23,14 +23,12 @@ than an exception: it binds its gRPC port before anything external is needed. Wh
 does not cover is recorded with it - the Charge handler reaches flagd per request, so the
 application path beyond the health service is not validated in CI.
 currency, product-reviews, recommendation, email and ad carry build, both security gates,
-SBOM and container health with no publication stage. fraud-detection carries build, both
-security gates and SBOM with no publication stage, and a running check in place of container
-health, because it never listens. flagd-ui carries build, both security gates, SBOM and its
-eleven upstream tests, with container health deferred to runtime and no publication stage.
-Evidence for the remaining component, accounting, is unpopulated until the corresponding
-implementation and validation have actually occurred. Wiring is not execution, publication
-is not runtime evidence, and none of this is fleet-wide delivery: accounting has no pipeline
-configuration at all. Identity and classification are facts about the source and are
+SBOM and container health with no publication stage. fraud-detection and accounting carry
+build, both security gates and SBOM with no publication stage, and a running check in place
+of container health, because neither listens. flagd-ui carries build, both security gates,
+SBOM and its eleven upstream tests, with container health deferred to runtime and no
+publication stage. Wiring is not execution, publication is not runtime evidence, and none of
+this is fleet-wide delivery. Identity and classification are facts about the source and are
 populated independently of that evidence.
 
 Five classes. Every component belongs to exactly one, and the class decides what evidence
@@ -44,7 +42,7 @@ hardening, the pipeline, and the evidence.
 
 | Component | Language tier | Upstream path at tag `2.2.0` | Container definition | Tests present upstream |
 |---|---|---|---|---|
-| accounting | .NET | `src/accounting` | Path-only modified | None |
+| accounting | .NET | `src/accounting` | Path plus hardening | None |
 | ad | Java | `src/ad` | Path plus hardening | None |
 | cart | .NET | `src/cart` | Path plus hardening | Unit, `tests/CartServiceTests.cs`, all skipped upstream |
 | checkout | Go | `src/checkout` | Modified beyond path retarget | Unit, `money/money_test.go` |
@@ -77,13 +75,12 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | C++ | currency | `ci/templates/lang-cpp.yml`, net-new |
 | Elixir | flagd-ui | `ci/templates/lang-elixir.yml`, net-new |
 
-All ten tiers have a template today. Fourteen services are wired to the pipeline. One is not:
-accounting, whose .NET tier has a template it has not been wired to. Sixteen components are
-wired in total, the two configured components in section 2 included. ADR-0017 selects the
-full justified project-built inventory as the target of an owner-selected end-to-end
-programme, so wiring accounting is selected work rather than work ruled out. .NET was the
-first of the six tiers to be implemented, C++ the second, Python the third, Ruby the fourth,
-Elixir the fifth and Java the sixth, and nothing here says those components are delivered.
+All ten tiers have a template today, and all fifteen services are wired to the pipeline.
+Seventeen components are wired in total, the two configured components in section 2
+included. ADR-0017 selects the full justified project-built inventory as the target of an
+owner-selected end-to-end programme; wiring it is not delivering it. .NET was the first of
+the six tiers to be implemented, C++ the second, Python the third, Ruby the fourth, Elixir
+the fifth and Java the sixth, and nothing here says those components are delivered.
 
 ## 2. Project-Built Configured Components
 
@@ -143,8 +140,9 @@ exception. It simply does not run.
 
 ## Container Health Disposition
 
-Fourteen of the sixteen wired components prove container health in CI. fraud-detection never
-listens, so it has no port to prove, and flagd-ui's health is deferred to runtime: a deferred
+Fourteen of the seventeen wired components prove container health in CI. fraud-detection and
+accounting never listen, so they have no port to prove, and flagd-ui's health is deferred to
+runtime: a deferred
 entry is not a pass and not runtime evidence. Two reach their listening state only after a
 startup dependency answers, so their health job starts that dependency beside them as a
 digest-pinned fixture on a job-private network. That proves the image starts against the
@@ -155,7 +153,7 @@ ports the job fails instead of passing a service it cannot prove. A worker that 
 is checked in a running mode that proves only that the process stays up for a bounded time
 beside a control that aborts itself at once. Both run under an init process, because as PID 1
 a process that aborts, as .NET does on an unhandled exception, is left running rather than
-exited. fraud-detection is the one component in that mode. The fixtures take no credential
+exited. fraud-detection and accounting are the two components in that mode. The fixtures take no credential
 and no data, and they are not the runtime dependency: cart's cache form and
 product-catalog's managed database are separate decisions.
 
@@ -166,6 +164,7 @@ product-catalog's managed database are separate decisions.
 | product-catalog | validated in CI against an ephemeral fixture: PostgreSQL 17.11, the Dev datastore's engine version, with trust authentication and no schema, because `main()` calls `initDatabase()` before the listener and exits 1 without it |
 | flagd-ui | health: deferred to runtime — `application.ex:20` starts `FlagdUi.Storage` before the endpoint and `storage.ex:23` reads `/app/data/demo.flagd.json`, which its pod mounts, so without that file the release exits 1 before listening |
 | fraud-detection | running in CI, not functional health — `main.kt` polls Kafka in a loop and opens no server socket, so there is no port to probe; given a `KAFKA_ADDR` that resolves with no broker behind it, the process must stay up for 30 s, and without the variable, or with an unresolvable address, it exits 1 and the job fails |
+| accounting | running in CI, not functional health — `Program.cs:14` builds a host with no server and `Consumer.cs:66` blocks in the Kafka consume loop, so there is no port to probe; given an unresolvable `KAFKA_ADDR` the process retries and must stay up for 30 s, and without the variable `Consumer.cs:42` throws and the job fails. Measured: without an init that exception leaves the process running as PID 1 rather than exited |
 
 ## Dependency Scanning Coverage
 
@@ -194,8 +193,9 @@ varies by language rather than by packaging. Measured at the current anchor:
 | flagd-ui | Elixir | none: Debian packages only; the Hex dependencies and the bundled OTP runtime are not visible | 54, from `mix.lock` |
 | ad | Java | 70 Maven, from the installed jars and the OpenTelemetry agent, and 13 Go modules from the base image's `pebble` binary | 78, from `gradle.lockfile` |
 | fraud-detection | Java | 46 Maven: the 45 whose metadata is inside the shadow jar, and the OpenTelemetry agent | 102, from `gradle.lockfile` |
+| accounting | .NET | 48 NuGet, from the application's and the shared runtime's `.deps.json` | 67, from `packages.lock.json` |
 
-Four of the sixteen carry no managed dependency into the image at all. For shipping, cart
+Four of the seventeen carry no managed dependency into the image at all. For shipping, cart
 and flagd-ui the source pass is the only dependency coverage there is, and flagd-ui's bundled
 OTP runtime is read by neither scan; currency has neither:
 opentelemetry-cpp is cloned at a release tag and compiled into the image, and neither scan
@@ -230,9 +230,9 @@ Sixteen items. No component carries the full set: checkout, shipping and quote c
 most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
 items but none of the runtime ones, frontend-proxy carries its pipeline configuration
 alone, cart, payment, frontend, product-catalog, currency, product-reviews, recommendation,
-email, flagd-ui, ad and fraud-detection each carry their pipeline configuration and an
-executed build, both security gates and an SBOM with no publication or runtime behind them,
-and the remaining component, accounting, carries none.
+email, flagd-ui, ad, fraud-detection and accounting each carry their pipeline configuration
+and an executed build, both security gates and an SBOM with no publication or runtime behind
+them.
 Upstream or external image origin, classification, modification record, container
 definition or image source, reusable pipeline configuration where project-built, build
 result where project-built, current scan result, SBOM where project-built, registry digest,

@@ -83,7 +83,6 @@ exactly as upstream wrote them.
 
 | Container definition | Component | Status |
 |---|---|---|
-| `services/accounting/Dockerfile` | accounting | Path-only modified |
 | `services/checkout/Dockerfile` | checkout | Path retarget, plus a runtime-stage `COPY` correction and the builder raised from `golang:1.24-bookworm` to a pinned `golang:1.25.13-bookworm` |
 | `services/checkout/genproto/Dockerfile` | checkout | Path-only modified |
 | `services/currency/genproto/Dockerfile` | currency | Path-only modified |
@@ -96,6 +95,7 @@ exactly as upstream wrote them.
 | `services/shipping/Dockerfile` | shipping | Path plus hardening |
 | `services/product-reviews/genproto/Dockerfile` | product-reviews | Upstream unchanged |
 | `services/recommendation/genproto/Dockerfile` | recommendation | Upstream unchanged |
+| `services/accounting/Dockerfile` | accounting | Path plus hardening |
 | `services/ad/Dockerfile` | ad | Path plus hardening |
 | `services/cart/src/Dockerfile` | cart | Path plus hardening |
 | `services/currency/Dockerfile` | currency | Path plus hardening |
@@ -110,7 +110,7 @@ exactly as upstream wrote them.
 | No container definition upstream | flagd | Upstream exception |
 
 One change to `services/accounting/Dockerfile` was reviewed and rejected. The file itself is
-retained and appears once above, as path-only modified. The rejection is recorded under
+retained and appears once above, as path plus hardening. The rejection is recorded under
 rejected modifications below.
 
 `frontend` and `product-catalog` keep the root build context. The prior bare-metal project
@@ -121,11 +121,11 @@ the pipeline harder to share than the problem it solves.
 
 ### Modified upstream files that are not container definitions
 
-The table above covers container definitions. Twenty-four upstream-derived files under
+The table above covers container definitions. Twenty-five upstream-derived files under
 `services/checkout/`, `services/product-catalog/`, `services/shipping/`,
 `services/quote/`, `services/frontend/`, `services/payment/`, `services/cart/`,
-`services/email/`, `services/flagd-ui/`, `services/ad/`, and `services/fraud-detection/` also
-differ from the pinned source, and they
+`services/email/`, `services/flagd-ui/`, `services/ad/`, `services/fraud-detection/`, and
+`services/accounting/` also differ from the pinned source, and they
 are recorded here so the modification inventory is not limited to container definitions. Those applications remain
 upstream work. What follows are corrections and dependency movement applied on top of them,
 not authorship of the services.
@@ -156,18 +156,20 @@ not authorship of the services.
 | `services/flagd-ui/mix.lock` | Dependency metadata | Re-resolved for those constraints, and six unused entries unlocked (cowboy, cowboy_telemetry, cowlib, opentelemetry_cowboy, opentelemetry_phoenix_live_view_process_propagator, ranch); fourteen packages moved, among them bandit 1.12.5, mint 1.11.0, phoenix 1.8.15, plug 1.20.3 and req 0.6.3. |
 | `services/ad/build.gradle` | Build script and dependency metadata | Every configuration locked in strict mode against the committed `gradle.lockfile`, outside the `-Pspeed` path, which compiles against copied jars rather than a resolved graph; jackson raised from `2.20.1` to `2.21.7` and aligned through its BOM, and netty aligned on `4.2.18.Final` through its BOM. The file carries a modification notice. |
 | `services/fraud-detection/build.gradle.kts` | Build script and dependency metadata | Every configuration locked in strict mode against the committed `gradle.lockfile`; `kafka-clients` raised from `4.1.1` to `4.1.2`, and jackson `2.21.7` and netty `4.2.18.Final` aligned through their BOMs. The file carries a modification notice. |
+| `services/accounting/Accounting.csproj` | Dependency metadata | `OpenTelemetry.AutoInstrumentation` stays at `1.13.0`; six packages it brings in are referenced directly at fixed versions: `OpenTelemetry.Resources.Host` `1.16.0-beta.2`, `OpenTelemetry.Exporter.Zipkin` `1.15.3`, `OpenTelemetry.Extensions.Propagators` `1.15.3`, `OpenTelemetry.Resources.Azure` `1.15.1-beta.1`, and `OpenTelemetry.Exporter.Console` and `OpenTelemetry.Exporter.OpenTelemetryProtocol` at `1.16.0`, the SDK release Host's fix requires and whose internals both exporters use. The file carries a modification notice. |
 
 Every dependency change above was made to move off modules a scan reported findings against:
 the image scan, which is the reason recorded in `a384c3d`, `bf07e2e`, `14d12f3`, and `1b4deb0`;
 the source gate, which is the reason recorded in `0463437`, `94eeedf`, `d2f3481`, and
 `30c556a`, and for the `services/flagd-ui/` changes; both gates for the later frontend and
-payment moves; and both scan gates for the `services/email/`, `services/ad/` and
-`services/fraud-detection/` changes. Neither the changes nor this record claims any review of
-those dependencies beyond that.
+payment moves; both scan gates for the `services/email/`, `services/ad/` and
+`services/fraud-detection/` changes; and the .NET dependency audit, which stops the Release
+build, with the source gate for the `services/accounting/` change. Neither the changes nor this
+record claims any review of those dependencies beyond that.
 
-Both `main.go` files, `shipping_service.rs`, the five `services/frontend/` source files,
-`cart.csproj`, flagd-ui's `mix.exs` and the two Gradle build scripts above carry an Apache-2.0
-modification notice in the format described below. The `go.mod` and `go.sum` files, `composer.json`, the `package.json`
+Both `main.go` files, `shipping_service.rs`, the five `services/frontend/` source files, both
+`.csproj` files, flagd-ui's `mix.exs` and the two Gradle build scripts above carry an
+Apache-2.0 modification notice in the format described below. The `go.mod` and `go.sum` files, `composer.json`, the `package.json`
 and `package-lock.json` files, `Gemfile.lock`, `.ruby-version` and `mix.lock` carry none, and
 none is added. `Gemfile.lock` and `mix.lock` are rewritten whole by Bundler and Mix, and
 `.ruby-version` holds a single version string, so none of them can hold one. `go.sum` is a
@@ -181,6 +183,7 @@ Go toolchain rather than authored source. This table is the record of their modi
 
 | Component | Change beyond the path retargeting |
 |---|---|
+| accounting | Runtime OpenSSL packages, `libssl3t64` and `openssl`, upgraded to the fixed revision the newest `aspnet:10.0` digest does not yet carry, while the stage is still root |
 | ad | OpenTelemetry Java agent defaulted to 2.26.1, the first release clear of a CRITICAL the image scan reported; OpenSSL pinned to the fixed revision the newest `eclipse-temurin:21-jre` digest does not yet carry; `gradle.lockfile` copied with the build files so the strict lock holds in the image build; the duplicate jar copy removed before the runtime stage |
 | cart | Base packages upgraded, application files owned by the built-in unprivileged user, container runs as that user |
 | currency | Default pinned OpenTelemetry C++ version, dedicated unprivileged user, entrypoint corrected to an absolute path |
@@ -332,10 +335,9 @@ has no repository in the platform registry, as `currency` does not, its publish 
 jobs stay unwired rather than pointing somewhere wrong. It is still wired through build and
 scan, because neither stage touches the registry.
 
-One component has no per-service configuration: accounting, whose .NET tier has a template
-it is not yet wired to. `frontend-proxy` and `image-provider` have no application
-language, and each carries a per-service `ci.yml` regardless, because a container
-definition is enough to build, lint and scan.
+`frontend-proxy` and `image-provider` have no application language, and each carries a
+per-service `ci.yml` regardless, because a container definition is enough to build, lint and
+scan.
 
 `services/cart/ci.yml` is net-new rather than carried, and is the only per-service file
 that declares `SERVICE_DOCKERFILE`, because cart is the only component whose container
@@ -346,13 +348,17 @@ template they extend, `ci/templates/lang-python.yml`, `services/email/ci.yml` wi
 tier template, `ci/templates/lang-ruby.yml`, `services/flagd-ui/ci.yml` with the Elixir tier
 template, `ci/templates/lang-elixir.yml`, and `services/ad/ci.yml` and
 `services/fraud-detection/ci.yml` with the Java tier template, `ci/templates/lang-java.yml`.
+`services/accounting/ci.yml` is net-new too and extends the .NET tier template unchanged. It
+carries the pipeline's one service-local step, which copies `pb/demo.proto` to the path
+`Accounting.csproj` compiles, and the file states why no shared template can hold it: cart,
+the other .NET service, reads `pb/` from its own project file.
 
 ### Not implemented
 
 ADR-0017 selects the full justified project-built inventory as the target of an
 owner-selected end-to-end programme. Selection is not delivery. All six tiers that breadth adds, .NET, C++,
-Python, Ruby, Elixir and Java, now have a template, and accounting is not yet wired to its
-tier. Recorded as not implemented:
+Python, Ruby, Elixir and Java, now have a template, and every project-built component is wired
+to the pipeline. Recorded as not implemented:
 
 - Image size budgets.
 
@@ -409,22 +415,24 @@ git show 2.2.0:LICENSE > ../out/LICENSE
 ```
 
 The comparison scope is `services/`, `pb/`, and `LICENSE`. Within that scope, comparing
-`../out` against this tree reports two kinds of difference and nothing else. Forty-six
+`../out` against this tree reports two kinds of difference and nothing else. Forty-seven
 upstream-derived files differ in content: the twenty-two container definitions recorded as
-modified above, plus the twenty-four the preceding section records. Those twenty-four are
+modified above, plus the twenty-five the preceding section records. Those twenty-five are
 what separates this result from the twenty-two figure, which counts modified container
-definitions only. The remaining three hundred and six upstream-derived files in the scope
-are byte-identical, and no upstream file in the scope is missing here. Twenty-four files are
+definitions only. The remaining three hundred and five upstream-derived files in the scope
+are byte-identical, and no upstream file in the scope is missing here. Twenty-six files are
 present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
 `image-provider`, `cart`, `currency`, `product-reviews`, `recommendation`, `email`,
-`flagd-ui`, `ad`, and `fraud-detection`; `services/flagd-ui/test/fixtures/demo.flagd.json`, a
-verbatim copy of upstream's `src/flagd/demo.flagd.json` at the pinned tag carried as test
-data; `services/frontend/eslint.config.mjs`; and six lock files,
-`services/cart/src/packages.lock.json`, `services/quote/composer.lock`, the pip-generated
-`requirements.lock` under `services/product-reviews` and `services/recommendation`, and the
-Gradle-generated `gradle.lockfile` under `services/ad` and `services/fraud-detection`, which
-give the source gate a declared dependency set to read. Those twenty-four are project-added,
+`flagd-ui`, `ad`, `fraud-detection`, and `accounting`;
+`services/flagd-ui/test/fixtures/demo.flagd.json`, a verbatim copy of upstream's
+`src/flagd/demo.flagd.json` at the pinned tag carried as test data;
+`services/frontend/eslint.config.mjs`; and seven lock files,
+`services/cart/src/packages.lock.json`, `services/accounting/packages.lock.json`,
+`services/quote/composer.lock`, the pip-generated `requirements.lock` under
+`services/product-reviews` and `services/recommendation`, and the Gradle-generated
+`gradle.lockfile` under `services/ad` and `services/fraud-detection`, which give the source
+gate a declared dependency set to read. Those twenty-six are project-added,
 and the fixture is an unmodified upstream file, so no modification notice applies to any of
 them. The flat ESLint configuration is project-added rather than a modification because
 ESLint 9 reads flat configuration only and upstream ships none; the upstream `.eslintrc`
@@ -436,8 +444,9 @@ and `LICENSE` are not part of it and are not classified by these counts.
 Inside the same scope, the notice correspondence covers the modified upstream-derived
 container definitions, `services/checkout/main.go`, `services/product-catalog/main.go`,
 `services/shipping/src/shipping_service.rs`, the five modified `services/frontend/` source
-files, `services/cart/src/cart.csproj`, `services/flagd-ui/mix.exs`,
-`services/ad/build.gradle`, and `services/fraud-detection/build.gradle.kts`. Every one of
+files, `services/cart/src/cart.csproj`, `services/accounting/Accounting.csproj`,
+`services/flagd-ui/mix.exs`, `services/ad/build.gradle`, and
+`services/fraud-detection/build.gradle.kts`. Every one of
 them that differs carries a modification notice, and every one carrying a notice differs. The
 `go.mod`, `go.sum`, `composer.json`, `package.json`, `package-lock.json`, `Gemfile.lock`,
 `.ruby-version` and `mix.lock` files are excluded for the reason given in the preceding
