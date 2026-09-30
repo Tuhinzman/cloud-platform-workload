@@ -3,15 +3,17 @@
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout.
-# Change: vulnerable Alpine runtime packages are pinned to measured fixed revisions so the
-# HIGH-severity OS findings reported by the image scan are removed without a broad upgrade.
+# Change: runtime base php:8.4-cli-alpine3.22, no longer rebuilt and carrying fixable HIGH findings
+# in c-ares and OpenSSL, replaced by php:8.4-cli-alpine3.23 pinned by digest, whose own packages are
+# fixed. Exact apk pins are dropped: Alpine removes a revision from the index once it is superseded.
+# Change: extension installer raised from 2.9.11 to 2.9.22, the first release supporting Alpine 3.23.
 # Change: composer.lock is copied into the vendor stage. Upstream copies only composer.json,
 # which makes `composer install` resolve dependencies afresh on every build - measured, it
 # logs "No composer.lock file present. Updating dependencies to latest instead". The source
 # gate reads composer.lock, so without this the scanned dependency set and the installed one
 # were free to differ and the scan would be evidence for an artifact nobody built.
 
-FROM ghcr.io/mlocati/php-extension-installer:2.9.11 AS installer
+FROM ghcr.io/mlocati/php-extension-installer:2.9.22@sha256:16c97587853d6254db940e5a83d2dc3287c50d407e1fd88a4be88b5a8aa0b6b5 AS installer
 
 FROM docker.io/library/composer:2.8.12 AS vendor
 
@@ -28,13 +30,7 @@ RUN composer install \
     --no-dev \
     --prefer-dist
 
-FROM docker.io/library/php:8.4-cli-alpine3.22
-
-RUN apk add --no-cache \
-        c-ares=1.34.8-r0 \
-        libcrypto3=3.5.8-r0 \
-        libssl3=3.5.8-r0 \
-        openssl=3.5.8-r0
+FROM docker.io/library/php:8.4-cli-alpine3.23@sha256:da7a7a945a493ac9c015f327231afd820bbe57fc6ae22f4f520a79fbd635ba39
 
 COPY --from=installer /usr/bin/install-php-extensions /usr/local/bin/
 

@@ -177,7 +177,7 @@ table is the record of their modification.
 | image-provider | Packages upgraded in a temporary privileged stage, served content given explicit ownership and read permissions, returns to the unprivileged nginx user |
 | payment | Application files and dependencies owned by the unprivileged runtime user |
 | product-reviews | Base packages upgraded |
-| quote | Vulnerable runtime packages pinned to measured fixed revisions rather than upgraded broadly |
+| quote | Runtime base moved from `php:8.4-cli-alpine3.22`, which is no longer rebuilt, to `php:8.4-cli-alpine3.23` pinned by digest, whose own packages carry the fixes the image scan requires; extension installer raised to 2.9.22, pinned by digest, for Alpine 3.23 support |
 | recommendation | TLS libraries upgraded, application directories given explicit read permissions |
 | frontend-proxy | Base image pinned to an immutable digest, package installation narrowed, TLS libraries added, configuration template given explicit ownership and read-only permissions |
 
