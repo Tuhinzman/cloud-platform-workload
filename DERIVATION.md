@@ -215,11 +215,11 @@ base images.
 | Rust | shipping | `Cargo.toml` | `ci/templates/lang-rust.yml` |
 | Ruby | email | `Gemfile` | Net-new |
 | PHP | quote | `composer.json` | `ci/templates/lang-php.yml` |
-| C++ | currency | `CMakeLists.txt` | Net-new |
+| C++ | currency | `CMakeLists.txt` | `ci/templates/lang-cpp.yml`, net-new |
 | Elixir | flagd-ui | `mix.exs` | Net-new |
 
-Five tiers of ten have a template today. The other five have none. ADR-0017 selects the
-full justified project-built inventory as the programme target, so those five tiers are
+Six tiers of ten have a template today. The other four have none. ADR-0017 selects the
+full justified project-built inventory as the programme target, so those four tiers are
 selected work; no schedule for them is claimed here.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
@@ -302,12 +302,11 @@ Each declares `SERVICE_NAME`, `SERVICE_PATH`, and `LANG_TIER`. The prior project
 per-service files also carried `IMAGE_REPO` and `PROMOTE_REPO` pointing at its own registry
 and a personal image namespace. Neither is carried, and no registry coordinate is written into these files: the
 account-bearing host and the role arrive as masked CI variables instead. Where a service
-has no repository in the platform registry, as `product-catalog`, `frontend`, `payment` and
-`cart` do not, its publish and evidence jobs stay unwired rather than pointing somewhere
-wrong. `cart` is still wired through build and scan, because neither stage touches the
-registry.
+has no repository in the platform registry, as `currency` does not, its publish and evidence
+jobs stay unwired rather than pointing somewhere wrong. It is still wired through build and
+scan, because neither stage touches the registry.
 
-Eight components have no per-service configuration. Seven of them have a language tier with
+Seven components have no per-service configuration. Six of them have a language tier with
 no template; accounting is the exception, because the .NET tier now has one and accounting
 is not yet wired to it. `frontend-proxy` and `image-provider` have no application
 language, and each carries a per-service `ci.yml` regardless, because a container
@@ -315,15 +314,16 @@ definition is enough to build, lint and scan.
 
 `services/cart/ci.yml` is net-new rather than carried, and is the only per-service file
 that declares `SERVICE_DOCKERFILE`, because cart is the only component whose container
-definition is not at its service root.
+definition is not at its service root. `services/currency/ci.yml` and the C++ tier template
+it extends, `ci/templates/lang-cpp.yml`, are net-new as well.
 
 ### Not implemented
 
 ADR-0017 selects the full justified project-built inventory as the target of an
-owner-selected end-to-end programme. Selection is not delivery, and .NET is the only tier of
-that breadth implemented so far, so the following are recorded as not implemented:
+owner-selected end-to-end programme. Selection is not delivery, and .NET and C++ are the only
+tiers of that breadth implemented so far, so the following are recorded as not implemented:
 
-- Language-tier templates for Java, Python, Ruby, C++, and Elixir.
+- Language-tier templates for Java, Python, Ruby, and Elixir.
 - Image size budgets.
 
 Net-new and now implemented, executed for checkout, shipping and quote, and since then for image-provider:
@@ -336,9 +336,9 @@ Net-new and now implemented, executed for checkout, shipping and quote, and sinc
 - Scanner ignore baselines, created when there is a real exception to record.
 
 Promote is declared as a stage and left unpopulated so the order stays visible, because
-promotion is a change to the GitOps repository rather than a pipeline job. Build and
-publish are populated for checkout, shipping, quote and image-provider, configured but not
-yet published for frontend-proxy, build-only for cart, and unpopulated for the rest. No
+promotion is a change to the GitOps repository rather than a pipeline job. Build is
+populated for every wired service. Publish is populated for checkout, shipping, quote and
+image-provider and configured for frontend-proxy, and no other service has published. No
 placeholder job was created.
 
 ## Licensing and Attribution
@@ -384,10 +384,11 @@ upstream-derived files differ in content: the twenty-two container definitions r
 modified above, plus the eleven the preceding section records. Those eleven are what
 separates this result from the twenty-two figure, which counts modified container
 definitions only. The remaining three hundred and nineteen upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Ten files
+scope are byte-identical, and no upstream file in the scope is missing here. Eleven files
 are present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
-`image-provider`, and `cart`, and `services/frontend/eslint.config.mjs`. Those ten are
+`image-provider`, `cart`, and `currency`, and `services/frontend/eslint.config.mjs`. Those
+eleven are
 project-added configuration with no upstream origin, so no modification notice applies
 to them. The flat ESLint configuration is project-added rather than a modification
 because ESLint 9 reads flat configuration only and upstream ships none; the upstream

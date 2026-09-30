@@ -1,0 +1,20 @@
+# The Dockerfile's own base image, so no new image is trusted. The compile itself is the image
+# build; this job adds the static analyzer. As with hadolint, warnings are logged and only
+# error-severity findings gate, so advisory findings stay visible without blocking.
+
+.lang-cpp-template:
+  stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+  image: alpine:3.21
+  script:
+    # Version-pinned: a repository update that drops it fails the job rather than changing
+    # the analyzer under the gate.
+    - apk add --no-cache cppcheck=2.14.2-r0
+    - cd "${SERVICE_PATH}"
+    - cppcheck --version
+    - cppcheck --enable=warning,portability --std=c++17 --quiet src/
+    # A missing or empty src/ exits non-zero, so nothing analysed never reads as clean.
+    - cppcheck --error-exitcode=1 --std=c++17 --quiet src/
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-cpp.yml"]

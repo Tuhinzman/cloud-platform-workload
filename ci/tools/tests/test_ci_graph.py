@@ -295,8 +295,10 @@ class SourceDependencyGate(unittest.TestCase):
 
     def test_services_declaring_none_are_the_measured_ones_only(self):
         """none is a claim about the service, not an escape hatch. Only components with no
-        package manager at all carry it, and adding another one has to be a decision."""
-        measured_none = {"frontend-proxy", "image-provider"}
+        package manager at all carry it, and adding another one has to be a decision.
+        currency is C++ with no language package manager; measured, the source pass resolves
+        zero packages there."""
+        measured_none = {"currency", "frontend-proxy", "image-provider"}
         actual = set()
         for svc_job in self.source_scanned():
             svc = svc_job.split(":")[0]

@@ -21,9 +21,10 @@ bounded startup and static-asset result, not a check of any backend call it woul
 than an exception: it binds its gRPC port before anything external is needed. What that
 does not cover is recorded with it - the Charge handler reaches flagd per request, so the
 application path beyond the health service is not validated in CI.
-Evidence for the remaining eight components is unpopulated until the corresponding
+currency carries build, both security gates, SBOM and container health with no publication
+stage. Evidence for the remaining seven components is unpopulated until the corresponding
 implementation and validation have actually occurred. Wiring is not execution,
-publication is not runtime evidence, and none of this is fleet-wide delivery: eight
+publication is not runtime evidence, and none of this is fleet-wide delivery: seven
 components have no pipeline configuration at all. Identity and classification are facts
 about the source and are populated independently of that evidence.
 
@@ -68,17 +69,17 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | Rust | shipping | `ci/templates/lang-rust.yml`, net-new |
 | Ruby | email | Net-new |
 | PHP | quote | `ci/templates/lang-php.yml`, net-new |
-| C++ | currency | Net-new |
+| C++ | currency | `ci/templates/lang-cpp.yml`, net-new |
 | Elixir | flagd-ui | Net-new |
 
-Five tiers of ten have a template today. Seven services are wired to the pipeline. Eight
-are not: seven because their tier has no template, and accounting because its .NET tier
-has one only as of this change and it has not been wired to it. Nine components are
+Six tiers of ten have a template today. Eight services are wired to the pipeline. Seven
+are not: six because their tier has no template, and accounting because its .NET tier
+has one and it has not been wired to it. Ten components are
 wired in total, the two configured components in section 2 included. ADR-0017 selects
 the full justified project-built inventory as the target of an owner-selected end-to-end
-programme, so the remaining five tiers are selected work rather than work ruled out.
-.NET was the first of the six to be implemented, and nothing here says those components
-are delivered.
+programme, so the remaining four tiers are selected work rather than work ruled out.
+.NET was the first of the six to be implemented and C++ the second, and nothing here
+says those components are delivered.
 
 ## 2. Project-Built Configured Components
 
@@ -138,14 +139,14 @@ exception. It simply does not run.
 
 ## Container Health Disposition
 
-Seven of the nine wired components prove container health in CI. Two cannot: their
+Eight of the ten wired components prove container health in CI. Two cannot: their
 process reaches its listening state only after a dependency exists, so CI records the
 measured reason instead. A deferred entry is not a pass and not runtime evidence; the
 readiness obligation stays open until a runtime window answers it.
 
 | Component | Container health |
 |---|---|
-| checkout, quote, shipping, frontend-proxy, image-provider, payment, frontend | validated in CI |
+| checkout, quote, shipping, frontend-proxy, image-provider, payment, frontend, currency | validated in CI |
 | cart | health: deferred to runtime — `Program.cs:98` resolves ValkeyCartStore before `app.Run()`, so `ValkeyCartStore.cs:101` throws without a reachable Valkey |
 | product-catalog | health: deferred to runtime — `main()` calls `initDatabase()` before the listener and exits 1 without a reachable PostgreSQL |
 
@@ -169,9 +170,12 @@ varies by language rather than by packaging. Measured at the current anchor:
 | product-catalog | Go | 57, from the module graph inside the binary | 58, from `go.mod` |
 | frontend-proxy | Envoy config | no application dependencies exist | none, declared |
 | image-provider | nginx + assets | no application dependencies exist | none, declared |
+| currency | C++ | none: OS packages only; the compiled-in opentelemetry-cpp is not visible | none, declared |
 
-Two of the nine carry no managed dependency into the image at all, so for those the
-source pass is the only dependency coverage there is. payment is the opposite case: its
+Three of the ten carry no managed dependency into the image at all. For shipping and cart
+the source pass is the only dependency coverage there is; currency has neither:
+opentelemetry-cpp is cloned at a release tag and compiled into the image, and neither scan
+reads it. payment is the opposite case: its
 image carries more component records than the lock file resolves, because the scanner
 reads the installed tree while the source pass reads the declared one. The counts are not
 expected to match and neither number is the other's check. The reverse also holds: the source pass
@@ -182,8 +186,9 @@ project whose dependency set it cannot resolve, and nothing is indistinguishable
 clean: before this control, cart and quote each resolved zero packages and reported zero
 findings. A service declaring managed dependencies must now resolve at least one package
 or its job fails, so a scanner blind spot blocks instead of passing quietly. Only
-frontend-proxy and image-provider declare `none`, and each genuinely has no package
-manager.
+frontend-proxy, image-provider and currency declare `none`. The first two genuinely have no
+package manager; currency has no language package manager, and its compiled-in library is
+the blind spot recorded above.
 
 The gate blocks on fixable HIGH and CRITICAL, the same threshold and the same
 `--ignore-unfixed` semantics the image gate uses. Findings without an available fix are
@@ -194,9 +199,9 @@ reported and not hidden.
 Sixteen items. No component carries the full set: checkout, shipping and quote carry
 most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
 items but none of the runtime ones, frontend-proxy carries its pipeline configuration
-alone, cart, payment, frontend and product-catalog each carry their pipeline configuration
-and an executed build, both security gates and an SBOM with no publication or runtime behind
-them, and the remaining eight components carry none.
+alone, cart, payment, frontend, product-catalog and currency each carry their pipeline
+configuration and an executed build, both security gates and an SBOM with no publication or
+runtime behind them, and the remaining seven components carry none.
 Upstream or external image origin, classification, modification record, container
 definition or image source, reusable pipeline configuration where project-built, build
 result where project-built, current scan result, SBOM where project-built, registry digest,

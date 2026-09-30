@@ -1,0 +1,55 @@
+# Declarative configuration for currency; behaviour lives in ci/templates. No publish or
+# evidence job: currency has no ECR repository and none is authorized.
+
+.currency-vars: &currency-vars
+  SERVICE_NAME: currency
+  SERVICE_PATH: services/currency
+  LANG_TIER: cpp
+  # currency COPYs pb/demo.proto into its build and compiles its gRPC stubs from it, so a
+  # change to the shared contract changes what currency builds.
+  SERVICE_SHARED_INPUTS: pb/**/*
+
+currency:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *currency-vars
+
+currency:lint-cpp:
+  extends: .lang-cpp-template
+  variables:
+    <<: *currency-vars
+
+currency:build:
+  extends: .image-build-template
+  variables:
+    <<: *currency-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+currency:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - currency:build
+  variables:
+    <<: *currency-vars
+
+# No language package manager: the Alpine packages are read by the image scan, and
+# opentelemetry-cpp, cloned at a release tag and compiled into /usr/local, is seen by neither.
+currency:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *currency-vars
+    SOURCE_DEPENDENCIES: none
+
+# VERSION is read by a static initializer with no null check, so without it the process aborts
+# before listening. The OTLP exporters fail per export, not at startup, so no collector is needed.
+currency:health-test:
+  extends: .image-health-template
+  dependencies:
+    - currency:build
+  variables:
+    <<: *currency-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e CURRENCY_PORT=8080
+      -e VERSION=ci
