@@ -144,17 +144,17 @@ not authorship of the services.
 | `services/frontend/providers/Ad.provider.tsx` | Application source | The unused `Money` import specifier removed. `Ad` and `Product` are still imported from the same module. Recorded in the same change that applies it. |
 | `services/frontend/providers/ProductReview.provider.tsx` | Application source | The unused `useEffect` import specifier removed. The other three React imports are still used, so the import statement remains. Recorded in the same change that applies it. |
 | `services/frontend/components/ProductReviews/ProductReviews.tsx` | Application source | `remainder` declared with `const` rather than `let`. It is assigned once and only read afterwards, so the change is behaviour-neutral. Recorded in the same change that applies it. |
-| `services/frontend/package.json` | Dependency metadata | `94eeedf` moved six direct pins: `next` from `16.1.1` to `16.3.3`, `sharp` from `0.34.5` to `0.35.4`, `styled-components` from `6.2.0` to `6.4.0`, `@grpc/grpc-js` from `1.12.6` to `1.12.7`, `@opentelemetry/auto-instrumentations-node` from `0.67.3` to `0.78.0` and `@opentelemetry/sdk-node` from `0.208.0` to `0.220.0`. |
-| `services/frontend/package-lock.json` | Dependency lock metadata | Re-resolved by npm for those pins, in `94eeedf`. |
-| `services/payment/package.json` | Dependency metadata | `d2f3481` moved three direct pins: `@grpc/grpc-js` from `1.12.6` to `1.12.7`, `@opentelemetry/auto-instrumentations-node` from `0.67.3` to `0.78.0` and `@opentelemetry/sdk-node` from `0.208.0` to `0.220.0`. |
-| `services/payment/package-lock.json` | Dependency lock metadata | Re-resolved by npm for those pins, in `d2f3481`. |
+| `services/frontend/package.json` | Dependency metadata | `94eeedf` moved six direct pins: `next` from `16.1.1` to `16.3.3`, `sharp` from `0.34.5` to `0.35.4`, `styled-components` from `6.2.0` to `6.4.0`, `@grpc/grpc-js` from `1.12.6` to `1.12.7`, `@opentelemetry/auto-instrumentations-node` from `0.67.3` to `0.78.0` and `@opentelemetry/sdk-node` from `0.208.0` to `0.220.0`. A later change moved `next` to `16.3.6` for GHSA-vcvr-r3jv-pc5j and `@grpc/grpc-js` to `1.13.6` for CVE-2026-101916, and `@openfeature/flagd-provider` from `0.13.3` to `0.13.4`, the first release whose peer range admits a fixed `@grpc/grpc-js`. |
+| `services/frontend/package-lock.json` | Dependency lock metadata | Re-resolved by npm for those pins, in `94eeedf`, and again for the later ones, which move twelve entries and add or remove none. |
+| `services/payment/package.json` | Dependency metadata | `d2f3481` moved three direct pins: `@grpc/grpc-js` from `1.12.6` to `1.12.7`, `@opentelemetry/auto-instrumentations-node` from `0.67.3` to `0.78.0` and `@opentelemetry/sdk-node` from `0.208.0` to `0.220.0`. A later change moved `@grpc/grpc-js` to `1.13.6` for CVE-2026-101916 and `@openfeature/flagd-provider` from `0.13.3` to `0.13.4`, the first release whose peer range admits it. |
+| `services/payment/package-lock.json` | Dependency lock metadata | Re-resolved by npm for those pins, in `d2f3481`, and again for the later ones, which move two entries and add or remove none. |
 | `services/cart/src/cart.csproj` | Dependency metadata | `30c556a` moved `OpenTelemetry.Resources.Host` from `1.14.0-beta.1` to `1.16.0-beta.2`, the first published version carrying the fix for GHSA-v8pv-4842-x354, and changed nothing else. |
 
 Every dependency change above was made to move off modules a scan reported findings against:
-the image scan, which is the reason recorded in `a384c3d`, `bf07e2e`, `14d12f3`, and `1b4deb0`,
-and the source gate, which is the reason recorded in `0463437`, `94eeedf`, `d2f3481`, and
-`30c556a`. Neither the changes nor this record claims any review of those dependencies beyond
-that.
+the image scan, which is the reason recorded in `a384c3d`, `bf07e2e`, `14d12f3`, and `1b4deb0`;
+the source gate, which is the reason recorded in `0463437`, `94eeedf`, `d2f3481`, and
+`30c556a`; and both gates for the later frontend and payment moves. Neither the changes nor
+this record claims any review of those dependencies beyond that.
 
 Both `main.go` files, `shipping_service.rs`, the five `services/frontend/` source files and
 `cart.csproj` above carry an Apache-2.0 modification notice in the format described below.
