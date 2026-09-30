@@ -52,12 +52,17 @@
 # addresses deliberately do not resolve so no other service is needed (gRPC connects lazily).
 # HEALTH_ENV is unquoted so each service supplies its own environment. deferred-to-runtime
 # records a measured reason and succeeds without validating health; runtime readiness is owed.
+# A service that cannot listen until a startup dependency answers names a digest-pinned fixture:
+# it runs beside the service on a job-private network and is never runtime evidence.
 .image-health-template:
   extends: .docker-dind
   stage: health-test
   variables:
     SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
     HEALTH_MODE: validated-in-ci
+    HEALTH_DEPENDENCY_IMAGE: ""
+    HEALTH_DEPENDENCY_ENV: ""
+    HEALTH_DEPENDENCY_READY: ""
   script:
     - |
       case "${HEALTH_MODE}" in
@@ -76,7 +81,31 @@
           ;;
       esac
     - docker load -i image.tar
-    - docker run -d --name "${SERVICE_NAME}-health" -p "${HEALTH_PORT}:${HEALTH_PORT}" ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
+    # A sibling in the DinD daemon, not a GitLab services: entry, which nested containers cannot
+    # resolve. A tag or an unreadiness would make the fixture, not the image, the thing tested.
+    - |
+      if [ -n "${HEALTH_DEPENDENCY_IMAGE}" ]; then
+        if ! echo "${HEALTH_DEPENDENCY_IMAGE}" | grep -Eq '@sha256:[0-9a-f]{64}$'; then
+          echo "FAIL: HEALTH_DEPENDENCY_IMAGE must be pinned by digest"
+          exit 1
+        fi
+        if [ -z "${HEALTH_DEPENDENCY_READY}" ]; then
+          echo "FAIL: HEALTH_DEPENDENCY_IMAGE requires HEALTH_DEPENDENCY_READY"
+          exit 1
+        fi
+        docker network create health-net
+        docker run -d --name health-dependency --network health-net ${HEALTH_DEPENDENCY_ENV} "${HEALTH_DEPENDENCY_IMAGE}"
+        for i in $(seq 1 60); do
+          if docker exec health-dependency sh -c "${HEALTH_DEPENDENCY_READY}" >/dev/null 2>&1; then break; fi
+          sleep 1
+        done
+        if ! docker exec health-dependency sh -c "${HEALTH_DEPENDENCY_READY}" >/dev/null 2>&1; then
+          docker logs health-dependency
+          echo "FAIL: the health dependency did not become ready"
+          exit 1
+        fi
+      fi
+    - docker run -d --name "${SERVICE_NAME}-health" ${HEALTH_DEPENDENCY_IMAGE:+--network health-net} -p "${HEALTH_PORT}:${HEALTH_PORT}" ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
     - |
       for i in $(seq 1 30); do
         if nc -z docker "${HEALTH_PORT}"; then break; fi
@@ -86,7 +115,8 @@
     - test "$(docker inspect -f '{{.State.Running}}' "${SERVICE_NAME}-health")" = "true"
     - docker logs "${SERVICE_NAME}-health"
   after_script:
-    - docker rm -f "${SERVICE_NAME}-health" || true
+    - docker rm -f "${SERVICE_NAME}-health" health-dependency || true
+    - docker network rm health-net || true
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/image.yml"]
 

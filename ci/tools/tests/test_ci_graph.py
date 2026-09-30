@@ -519,15 +519,15 @@ class DeferredHealth(unittest.TestCase):
                 self.assertIn(health_mode(config, job), {VALIDATED, DEFERRED})
 
     def test_the_deferred_set_is_the_measured_one_only(self):
-        """Deferring is a claim about a service, not a way past a failing probe."""
+        """Deferring is a claim about a service, not a way past a failing probe. cart and
+        product-catalog left it once a startup fixture made their probe real."""
         config = ci_graph.load_config(ROOT)
         deferred = {j.split(":")[0] for j in health_jobs() if health_mode(config, j) == DEFERRED}
-        self.assertEqual(deferred, {"cart", "product-catalog"})
+        self.assertEqual(deferred, set())
 
-    def test_deferred_services_still_declare_a_health_job(self):
-        for svc in ("cart", "product-catalog"):
-            with self.subTest(service=svc):
-                self.assertIn(f"{svc}:health-test", health_jobs())
+    def test_every_built_service_declares_a_health_job(self):
+        built = {job.split(":")[0] for job in jobs_extending(".image-build-template")}
+        self.assertEqual({job.split(":")[0] for job in health_jobs()}, built)
 
     def test_no_health_job_carries_allow_failure(self):
         config = ci_graph.load_config(ROOT)
@@ -535,31 +535,142 @@ class DeferredHealth(unittest.TestCase):
             with self.subTest(job=job):
                 self.assertNotIn("allow_failure", ci_graph.resolve(config, job))
 
-    def test_deferred_services_add_no_dependency_container(self):
-        """The dind daemon the template already provides is the only service allowed."""
+    def test_no_health_job_adds_a_gitlab_service(self):
+        """The dind daemon is the only GitLab service: a fixture runs as a sibling inside it,
+        because nested containers cannot resolve a services: entry."""
         config = ci_graph.load_config(ROOT)
         dind = ci_graph.resolve(config, ".docker-dind")["services"]
-        for svc in ("cart", "product-catalog"):
-            with self.subTest(service=svc):
-                self.assertEqual(ci_graph.resolve(config, f"{svc}:health-test")["services"], dind)
+        for job in sorted(health_jobs()):
+            with self.subTest(job=job):
+                self.assertEqual(ci_graph.resolve(config, job)["services"], dind)
 
-    def test_deferred_services_add_no_local_script(self):
+    def test_no_health_job_adds_a_local_script(self):
+        """Upstream sources may hold gRPC health protos (currency does); only a service that
+        names a fixture is checked for an added health file."""
         config = ci_graph.load_config(ROOT)
         template_script = ci_graph.resolve(config, HEALTH_TEMPLATE)["script"]
-        for svc in ("cart", "product-catalog"):
-            with self.subTest(service=svc):
+        for job in sorted(health_jobs()):
+            svc = job.split(":")[0]
+            with self.subTest(job=job):
                 body = yaml.safe_load(open(os.path.join(ROOT, "services", svc, "ci.yml")))
-                self.assertNotIn("script", body[f"{svc}:health-test"])
-                self.assertEqual(ci_graph.resolve(config, f"{svc}:health-test")["script"],
-                                 template_script)
-                self.assertEqual(glob.glob(os.path.join(ROOT, "services", svc, "**", "health*"),
-                                           recursive=True), [])
+                self.assertNotIn("script", body[job])
+                self.assertEqual(ci_graph.resolve(config, job)["script"], template_script)
+                if (ci_graph.resolve(config, job).get("variables") or {}).get("HEALTH_DEPENDENCY_IMAGE"):
+                    self.assertEqual(glob.glob(os.path.join(ROOT, "services", svc, "**", "health*"),
+                                               recursive=True), [])
 
-    def test_the_inventory_does_not_report_deferred_health_as_validated(self):
-        text = open(os.path.join(ROOT, "SERVICE-INVENTORY.md")).read()
-        for svc in ("cart", "product-catalog"):
+    def test_every_publisher_validates_health_in_ci(self):
+        """A deferral records that CI did not validate health, so it cannot sit in front of a
+        publish."""
+        config = ci_graph.load_config(ROOT)
+        for svc in sorted(publishers()):
             with self.subTest(service=svc):
-                self.assertRegex(text, rf"{svc}[^|]*\|[^|]*health: deferred to runtime")
+                self.assertEqual(health_mode(config, f"{svc}:health-test"), VALIDATED)
+
+    def test_every_dependency_fixture_is_pinned_and_declares_readiness(self):
+        """A fixture is a claim that the service cannot listen without it, so the set of users
+        is the measured one and adding another has to be a decision."""
+        config = ci_graph.load_config(ROOT)
+        users = set()
+        for job in sorted(health_jobs()):
+            variables = ci_graph.resolve(config, job).get("variables") or {}
+            image = variables.get("HEALTH_DEPENDENCY_IMAGE", "")
+            if not image:
+                continue
+            users.add(job.split(":")[0])
+            with self.subTest(job=job):
+                self.assertRegex(image, r"@sha256:[0-9a-f]{64}$")
+                self.assertTrue(variables.get("HEALTH_DEPENDENCY_READY", "").strip())
+        self.assertEqual(users, {"cart", "product-catalog"})
+
+    def test_the_inventory_matches_each_health_mode(self):
+        """Deferred health must read as deferred, and fixture-backed health must say what it
+        ran against, so neither can be read as runtime readiness."""
+        config = ci_graph.load_config(ROOT)
+        text = open(os.path.join(ROOT, "SERVICE-INVENTORY.md")).read()
+        for job in sorted(health_jobs()):
+            svc = job.split(":")[0]
+            variables = ci_graph.resolve(config, job).get("variables") or {}
+            with self.subTest(service=svc):
+                if health_mode(config, job) == DEFERRED:
+                    self.assertRegex(text, rf"{svc}[^|]*\|[^|]*health: deferred to runtime")
+                elif variables.get("HEALTH_DEPENDENCY_IMAGE"):
+                    self.assertRegex(text, rf"{svc}[^|]*\|[^|]*validated in CI against an ephemeral fixture")
+
+
+def fixture_step(config=None):
+    """The template's own fixture step, so the controls below run what CI runs."""
+    config = config or ci_graph.load_config(ROOT)
+    steps = ci_graph.resolve(config, HEALTH_TEMPLATE)["script"]
+    found = [s for s in steps if 'if [ -n "${HEALTH_DEPENDENCY_IMAGE}" ]' in s]
+    return found
+
+
+def run_fixture_step(step, docker_stub=False, **env):
+    import subprocess, tempfile
+    path = os.environ["PATH"]
+    with tempfile.TemporaryDirectory() as tmp:
+        if docker_stub:
+            stub = os.path.join(tmp, "docker")
+            with open(stub, "w") as handle:
+                handle.write("#!/bin/sh\nexit 0\n")
+            os.chmod(stub, 0o700)
+            path = tmp + os.pathsep + path
+        return subprocess.run(["sh", "-c", step], capture_output=True, text=True,
+                              env={"PATH": path, **env})
+
+
+class DependencyFixture(unittest.TestCase):
+    """The fixture step refuses anything that would make the fixture, not the image, the thing
+    tested: a tag that can move, or no readiness to wait for."""
+
+    def step(self):
+        found = fixture_step()
+        self.assertEqual(len(found), 1, "exactly one fixture step")
+        return found[0]
+
+    def test_no_fixture_is_a_no_op(self):
+        r = run_fixture_step(self.step(), HEALTH_DEPENDENCY_IMAGE="")
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+    def test_a_tag_without_a_digest_fails(self):
+        for image in ("valkey/valkey:9.0.1-alpine3.23", "postgres@sha256:abc", "postgres:17@sha256:" + "0" * 63):
+            with self.subTest(image=image):
+                r = run_fixture_step(self.step(), docker_stub=True, HEALTH_DEPENDENCY_IMAGE=image,
+                                     HEALTH_DEPENDENCY_READY="true")
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("must be pinned by digest", r.stdout)
+
+    def test_a_missing_readiness_command_fails(self):
+        r = run_fixture_step(self.step(), docker_stub=True,
+                             HEALTH_DEPENDENCY_IMAGE="postgres:17.11@sha256:" + "0" * 64,
+                             HEALTH_DEPENDENCY_READY="")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("requires HEALTH_DEPENDENCY_READY", r.stdout)
+
+    def test_a_pinned_ready_fixture_proceeds(self):
+        r = run_fixture_step(self.step(), docker_stub=True,
+                             HEALTH_DEPENDENCY_IMAGE="postgres:17.11@sha256:" + "0" * 64,
+                             HEALTH_DEPENDENCY_READY="true")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_removing_the_pin_check_is_caught(self):
+        """The negative control: without the check, a moving tag proceeds as if pinned."""
+        step = self.step()
+        start = step.index("  if ! echo")
+        end = step.index("  fi", start) + len("  fi")
+        mutant = step[:start] + step[end:]
+        self.assertNotEqual(mutant, step)
+        r = run_fixture_step(mutant, docker_stub=True, HEALTH_DEPENDENCY_IMAGE="valkey/valkey:latest",
+                             HEALTH_DEPENDENCY_READY="true")
+        self.assertEqual(r.returncode, 0)
+
+    def test_the_service_joins_the_fixture_network_only_with_a_fixture(self):
+        config = ci_graph.load_config(ROOT)
+        runs = [s for s in ci_graph.resolve(config, HEALTH_TEMPLATE)["script"]
+                if s.startswith('docker run -d --name "${SERVICE_NAME}-health"')]
+        self.assertEqual(len(runs), 1)
+        self.assertIn("${HEALTH_DEPENDENCY_IMAGE:+--network health-net}", runs[0])
 
     def test_no_terminal_classification_mechanism_exists_to_assert_against(self):
         """Enforcement owed: nothing here decides FULL-CHAIN-VALIDATED, so a deferred

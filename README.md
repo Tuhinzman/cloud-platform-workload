@@ -72,10 +72,9 @@ same shared templates for build, scan, SBOM and container health; neither carrie
 language tier, because neither directory holds application source. cart is wired through
 the shared templates for Dockerfile lint, .NET lint, tests, build, scan and SBOM. Its
 three upstream tests all carry a skip, so that job asserts nothing today. Its container
-health job, like product-catalog's, runs in a deferred mode: cart needs its cache at
-startup and product-catalog its database, so neither process can listen in CI, and a
-passing job records that deferral without validating health, which remains owed at
-runtime. currency is wired for Dockerfile lint, C++ static analysis, build, image and source
+health job, like product-catalog's, starts the dependency the process needs before it can
+listen as a digest-pinned fixture beside it, Valkey for cart and PostgreSQL for
+product-catalog, so the probe is a real startup result; runtime readiness remains owed. currency is wired for Dockerfile lint, C++ static analysis, build, image and source
 scans and a container health job, with no publication stage; upstream ships no tests for it.
 The product-catalog Go lint job is now configured as blocking and its latest
 validated run reports no findings. payment declares no linter and no TypeScript, so it

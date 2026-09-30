@@ -32,12 +32,22 @@ product-catalog:scan-image:
   variables:
     <<: *product-catalog-vars
 
+# main() calls initDatabase() before the listener and exits 1 without a reachable PostgreSQL. The
+# fixture runs the Dev datastore's engine version (RDS 17.11) in the chart's postgres image, with
+# trust authentication on a job-private network so no credential exists; startup needs no schema.
 product-catalog:health-test:
   extends: .image-health-template
-  dependencies: []
+  dependencies:
+    - product-catalog:build
   variables:
     <<: *product-catalog-vars
-    HEALTH_MODE: deferred-to-runtime
-    HEALTH_REASON: >-
-      main() calls initDatabase() before the listener and exits 1 without a reachable
-      PostgreSQL, so the gRPC port never opens in CI
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e PRODUCT_CATALOG_PORT=8080
+      -e DB_CONNECTION_STRING=postgres://postgres@health-dependency:5432/otel
+      -e PGSSLMODE=disable
+    HEALTH_DEPENDENCY_IMAGE: postgres:17.11@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f
+    HEALTH_DEPENDENCY_ENV: >-
+      -e POSTGRES_HOST_AUTH_METHOD=trust
+      -e POSTGRES_DB=otel
+    HEALTH_DEPENDENCY_READY: pg_isready -h 127.0.0.1 -U postgres -d otel

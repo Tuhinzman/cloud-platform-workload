@@ -48,12 +48,18 @@ cart:scan-source:
   variables:
     <<: *cart-vars
 
+# Program.cs:98 resolves ValkeyCartStore before app.Run(), and Initialize() throws without a
+# reachable Valkey, so Kestrel listens only once the fixture answers. The fixture is the upstream
+# chart's valkey-cart image; the runtime form of cart's cache is not decided by this.
 cart:health-test:
   extends: .image-health-template
-  dependencies: []
+  dependencies:
+    - cart:build
   variables:
     <<: *cart-vars
-    HEALTH_MODE: deferred-to-runtime
-    HEALTH_REASON: >-
-      Program.cs:98 resolves ValkeyCartStore before app.Run(), so Initialize() throws at
-      ValkeyCartStore.cs:101 without a reachable Valkey and Kestrel never listens
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e ASPNETCORE_HTTP_PORTS=8080
+      -e VALKEY_ADDR=health-dependency:6379
+    HEALTH_DEPENDENCY_IMAGE: valkey/valkey:9.0.1-alpine3.23@sha256:c106a0c03bcb23cbdf9febe693114cb7800646b11ca8b303aee7409de005faa8
+    HEALTH_DEPENDENCY_READY: valkey-cli ping | grep -qx PONG

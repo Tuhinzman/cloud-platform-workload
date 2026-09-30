@@ -10,11 +10,12 @@ image-provider has build, scan, SBOM and artifact-publication evidence; it has n
 evidence, because no runtime window has included it. Two publications carry a provenance
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
 is wired for build, scan, SBOM and container health and has published nothing. cart has
-executed build, scan and SBOM on a pipeline that passed, defers container health to
-runtime, and has published nothing: no registry repository, no digest, no promotion, no
+executed build, scan and SBOM on a pipeline that passed, validates container health against
+an ephemeral Valkey fixture, and has published nothing: no digest, no promotion, no
 runtime. payment and frontend each carry build, both security gates, SBOM, container
 health and the manual publish and evidence jobs on main; product-catalog carries all of
-those but the publication jobs and defers container health to runtime. None of the four has
+those but the publication jobs, and validates container health against an ephemeral
+PostgreSQL fixture. None of the four has
 published anything. frontend additionally returned
 HTTP 200 with rendered HTML and served the `/_next/` assets that page referenced; that is a
 bounded startup and static-asset result, not a check of any backend call it would make. Its container health is a real result rather
@@ -139,16 +140,19 @@ exception. It simply does not run.
 
 ## Container Health Disposition
 
-Eight of the ten wired components prove container health in CI. Two cannot: their
-process reaches its listening state only after a dependency exists, so CI records the
-measured reason instead. A deferred entry is not a pass and not runtime evidence; the
-readiness obligation stays open until a runtime window answers it.
+All ten wired components prove container health in CI. Two reach their listening state
+only after a startup dependency answers, so their health job starts that dependency beside
+them as a digest-pinned fixture on a job-private network. That proves the image starts
+against the dependency it needs; it is not runtime readiness, and the readiness obligation
+stays open until a runtime window answers it. The fixtures take no credential and no data,
+and they are not the runtime dependency: cart's cache form and product-catalog's managed
+database are separate decisions.
 
 | Component | Container health |
 |---|---|
 | checkout, quote, shipping, frontend-proxy, image-provider, payment, frontend, currency | validated in CI |
-| cart | health: deferred to runtime — `Program.cs:98` resolves ValkeyCartStore before `app.Run()`, so `ValkeyCartStore.cs:101` throws without a reachable Valkey |
-| product-catalog | health: deferred to runtime — `main()` calls `initDatabase()` before the listener and exits 1 without a reachable PostgreSQL |
+| cart | validated in CI against an ephemeral fixture: Valkey 9.0.1 from the upstream chart, because `Program.cs:98` resolves ValkeyCartStore before `app.Run()` and `ValkeyCartStore.cs:101` throws without it |
+| product-catalog | validated in CI against an ephemeral fixture: PostgreSQL 17.11, the Dev datastore's engine version, with trust authentication and no schema, because `main()` calls `initDatabase()` before the listener and exits 1 without it |
 
 ## Dependency Scanning Coverage
 
