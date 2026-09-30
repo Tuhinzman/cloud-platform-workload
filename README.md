@@ -47,9 +47,10 @@ Twenty-two container definitions are modified, each carrying an Apache-2.0 modif
 notice. They are adapted deliberately, for this repository's build layout and for the
 platform work this workload exists to exercise.
 
-Beyond those, `checkout` carries project modifications to its application source and its Go
-dependency metadata, `product-catalog` and `shipping` to their application source, and
-`quote` to its dependency metadata, and `frontend` to five application-source files. Every
+Beyond those, `checkout` and `product-catalog` carry project modifications to their
+application source and their Go dependency metadata, `shipping` to its application source,
+`quote`, `payment` and `cart` to their dependency metadata, and `frontend` to five
+application-source files and its npm dependency metadata. Every
 other upstream-derived file in the compared scope,
 including all remaining application source and the protobuf contract, is byte-identical to
 the pinned upstream release. That scope is `services/`, `pb/` and `LICENSE`, and the
