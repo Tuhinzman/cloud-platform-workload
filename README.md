@@ -50,20 +50,20 @@ platform work this workload exists to exercise.
 Beyond those, `checkout` and `product-catalog` carry project modifications to their
 application source and their Go dependency metadata, `shipping` to its application source,
 `quote`, `payment`, `cart` and `flagd-ui` to their dependency metadata, `email` to its
-dependency and Ruby version metadata, and `frontend` to five application-source files and its npm dependency
-metadata. Every
-other upstream-derived file in the compared scope,
-including all remaining application source and the protobuf contract, is byte-identical to
-the pinned upstream release. That scope is `services/`, `pb/` and `LICENSE`, and the
-comparison makes no claim about files outside it.
+dependency and Ruby version metadata, `ad` and `fraud-detection` to their Gradle build
+scripts, and `frontend` to five application-source files and its npm dependency metadata.
+Every other upstream-derived file in the compared scope, including all remaining application
+source and the protobuf contract, is byte-identical to the pinned upstream release. That
+scope is `services/`, `pb/` and `LICENSE`, and the comparison makes no claim about files
+outside it.
 
 Upstream wrote this application and none of it is claimed as this project's work.
 [DERIVATION.md](DERIVATION.md) is the per-file record of what differs and how to reproduce
 the tree.
 
-The pipeline now has shared templates for Go, Node, PHP, Rust, .NET, C++, Python, Ruby and Elixir, but validation
-coverage is not uniform across the fleet. Checkout has an executed and passing
-Dockerfile lint path. Shipping and quote have executed validated build, scan, SBOM, and
+The pipeline now has shared templates for all ten tiers, Go, Node, PHP, Rust, .NET, C++,
+Python, Ruby, Elixir and Java, but validation coverage is not uniform across the fleet.
+Checkout has an executed and passing Dockerfile lint path. Shipping and quote have executed validated build, scan, SBOM, and
 container health paths. Frontend, payment, and product-catalog are wired through build,
 image and source scans and a container health job, and each has passed its merge-request
 pipeline; frontend and payment pass the health check. Frontend and payment also carry the
@@ -88,7 +88,12 @@ stage; upstream ships no tests for it. flagd-ui is wired for Dockerfile lint, an
 compile and format check, its eleven upstream tests, build, and image and source scans, with
 no publication stage; its tests read upstream's own flag file, carried as test data, and its
 container health is deferred to runtime because the release will not start without the flag
-file its pod mounts.
+file its pod mounts. ad and fraud-detection are wired for Dockerfile lint, a Gradle build
+under strict dependency locking, build, and image and source scans, with no publication
+stage; upstream ships no tests for either. ad's container health is validated in CI.
+fraud-detection is a Kafka consumer that never listens, so its job proves only that the
+process stays running for a bounded time beside a control that aborts itself at once, which
+is not functional health.
 The product-catalog Go lint job is now configured as blocking and its latest
 validated run reports no findings. payment declares no linter and no TypeScript, so it
 extends a Node parse check rather than a lint, which asserts only that every `.js` file
@@ -105,11 +110,11 @@ pipeline retain the provenance itself, shipping first and then image-provider: e
 keeps the registry manifest bytes whose sha256 is the published digest. frontend-proxy is
 wired for those stages and has published nothing, and cart is wired through scan with no
 publication stage, because no registry repository is declared for it. Those stages are not
-evidenced fleet-wide and three components have no pipeline configuration at all. ADR-0017
-now selects the full justified project-built inventory as the target of an owner-selected
-end-to-end programme, so those three are selected work rather than work ruled out;
-selecting them is not delivering them, and promotion remains a separate implementation and
-validation obligation.
+evidenced fleet-wide and accounting has no pipeline configuration at all. ADR-0017 now
+selects the full justified project-built inventory as the target of an owner-selected
+end-to-end programme, so accounting is selected work rather than work ruled out; selecting
+it is not delivering it, and promotion remains a separate implementation and validation
+obligation.
 
 ## Licence and Attribution
 

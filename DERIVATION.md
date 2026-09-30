@@ -84,11 +84,9 @@ exactly as upstream wrote them.
 | Container definition | Component | Status |
 |---|---|---|
 | `services/accounting/Dockerfile` | accounting | Path-only modified |
-| `services/ad/Dockerfile` | ad | Path-only modified |
 | `services/checkout/Dockerfile` | checkout | Path retarget, plus a runtime-stage `COPY` correction and the builder raised from `golang:1.24-bookworm` to a pinned `golang:1.25.13-bookworm` |
 | `services/checkout/genproto/Dockerfile` | checkout | Path-only modified |
 | `services/currency/genproto/Dockerfile` | currency | Path-only modified |
-| `services/fraud-detection/Dockerfile` | fraud-detection | Path-only modified |
 | **`services/frontend/Dockerfile`** | **frontend** | **Path plus hardening** |
 | `services/frontend/genproto/Dockerfile` | frontend | Path-only modified |
 | `services/frontend/Dockerfile.cypress` | frontend | Path-only modified |
@@ -98,10 +96,12 @@ exactly as upstream wrote them.
 | `services/shipping/Dockerfile` | shipping | Path plus hardening |
 | `services/product-reviews/genproto/Dockerfile` | product-reviews | Upstream unchanged |
 | `services/recommendation/genproto/Dockerfile` | recommendation | Upstream unchanged |
+| `services/ad/Dockerfile` | ad | Path plus hardening |
 | `services/cart/src/Dockerfile` | cart | Path plus hardening |
 | `services/currency/Dockerfile` | currency | Path plus hardening |
 | `services/email/Dockerfile` | email | Path plus hardening |
 | `services/flagd-ui/Dockerfile` | flagd-ui | Path plus hardening |
+| `services/fraud-detection/Dockerfile` | fraud-detection | Path plus hardening |
 | `services/payment/Dockerfile` | payment | Path plus hardening |
 | `services/product-reviews/Dockerfile` | product-reviews | Path plus hardening |
 | `services/recommendation/Dockerfile` | recommendation | Path plus hardening |
@@ -121,10 +121,11 @@ the pipeline harder to share than the problem it solves.
 
 ### Modified upstream files that are not container definitions
 
-The table above covers container definitions. Twenty-two upstream-derived files under
+The table above covers container definitions. Twenty-four upstream-derived files under
 `services/checkout/`, `services/product-catalog/`, `services/shipping/`,
 `services/quote/`, `services/frontend/`, `services/payment/`, `services/cart/`,
-`services/email/`, and `services/flagd-ui/` also differ from the pinned source, and they
+`services/email/`, `services/flagd-ui/`, `services/ad/`, and `services/fraud-detection/` also
+differ from the pinned source, and they
 are recorded here so the modification inventory is not limited to container definitions. Those applications remain
 upstream work. What follows are corrections and dependency movement applied on top of them,
 not authorship of the services.
@@ -153,17 +154,20 @@ not authorship of the services.
 | `services/email/.ruby-version` | Toolchain metadata | 3.4.7 to 3.4.11, matching the container definition's move to the first 3.4 release whose bundled gems carry the fixes. |
 | `services/flagd-ui/mix.exs` | Dependency metadata | bandit raised from `~> 1.10.0` to `~> 1.12.5` and req from `~> 0.5.16` to `~> 0.6.1`, the smallest constraints that clear the HIGH findings the source gate reported without taking bandit releases that carry newer HIGH advisories. The file carries a modification notice. |
 | `services/flagd-ui/mix.lock` | Dependency metadata | Re-resolved for those constraints, and six unused entries unlocked (cowboy, cowboy_telemetry, cowlib, opentelemetry_cowboy, opentelemetry_phoenix_live_view_process_propagator, ranch); fourteen packages moved, among them bandit 1.12.5, mint 1.11.0, phoenix 1.8.15, plug 1.20.3 and req 0.6.3. |
+| `services/ad/build.gradle` | Build script and dependency metadata | Every configuration locked in strict mode against the committed `gradle.lockfile`, outside the `-Pspeed` path, which compiles against copied jars rather than a resolved graph; jackson raised from `2.20.1` to `2.21.7` and aligned through its BOM, and netty aligned on `4.2.18.Final` through its BOM. The file carries a modification notice. |
+| `services/fraud-detection/build.gradle.kts` | Build script and dependency metadata | Every configuration locked in strict mode against the committed `gradle.lockfile`; `kafka-clients` raised from `4.1.1` to `4.1.2`, and jackson `2.21.7` and netty `4.2.18.Final` aligned through their BOMs. The file carries a modification notice. |
 
 Every dependency change above was made to move off modules a scan reported findings against:
 the image scan, which is the reason recorded in `a384c3d`, `bf07e2e`, `14d12f3`, and `1b4deb0`;
 the source gate, which is the reason recorded in `0463437`, `94eeedf`, `d2f3481`, and
 `30c556a`, and for the `services/flagd-ui/` changes; both gates for the later frontend and
-payment moves; and both scan gates for the `services/email/` changes. Neither the changes nor
-this record claims any review of those dependencies beyond that.
+payment moves; and both scan gates for the `services/email/`, `services/ad/` and
+`services/fraud-detection/` changes. Neither the changes nor this record claims any review of
+those dependencies beyond that.
 
 Both `main.go` files, `shipping_service.rs`, the five `services/frontend/` source files,
-`cart.csproj` and flagd-ui's `mix.exs` above carry an Apache-2.0 modification notice in the
-format described below. The `go.mod` and `go.sum` files, `composer.json`, the `package.json`
+`cart.csproj`, flagd-ui's `mix.exs` and the two Gradle build scripts above carry an Apache-2.0
+modification notice in the format described below. The `go.mod` and `go.sum` files, `composer.json`, the `package.json`
 and `package-lock.json` files, `Gemfile.lock`, `.ruby-version` and `mix.lock` carry none, and
 none is added. `Gemfile.lock` and `mix.lock` are rewritten whole by Bundler and Mix, and
 `.ruby-version` holds a single version string, so none of them can hold one. `go.sum` is a
@@ -177,10 +181,12 @@ Go toolchain rather than authored source. This table is the record of their modi
 
 | Component | Change beyond the path retargeting |
 |---|---|
+| ad | OpenTelemetry Java agent defaulted to 2.26.1, the first release clear of a CRITICAL the image scan reported; OpenSSL pinned to the fixed revision the newest `eclipse-temurin:21-jre` digest does not yet carry; `gradle.lockfile` copied with the build files so the strict lock holds in the image build; the duplicate jar copy removed before the runtime stage |
 | cart | Base packages upgraded, application files owned by the built-in unprivileged user, container runs as that user |
 | currency | Default pinned OpenTelemetry C++ version, dedicated unprivileged user, entrypoint corrected to an absolute path |
 | email | Base packages upgraded, Ruby moved from 3.4.7 on Alpine 3.22 to 3.4.11 on Alpine 3.23, the first 3.4 release whose bundled gems carry the fixes the scan gates require |
 | flagd-ui | Runtime base moved to Debian bookworm, newer OTP, packages upgraded, ncurses moved to the supported major version |
+| fraud-detection | OpenTelemetry Java agent defaulted to 2.26.1, the first release clear of a CRITICAL the image scan reported; runtime base moved from distroless `java17-debian12` to `java17-debian13`, because the newest debian12 digest still carries nine fixable HIGH findings and distroless cannot upgrade in place; the Java major is unchanged |
 | image-provider | Packages upgraded in a temporary privileged stage, served content given explicit ownership and read permissions, returns to the unprivileged nginx user |
 | frontend | Runtime base moved from `nodejs22-debian12` to `nodejs22-debian13` and pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
 | payment | Application files and dependencies owned by the unprivileged runtime user; runtime base moved from `nodejs22-debian12` to `nodejs22-debian13` and pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
@@ -232,7 +238,7 @@ base images.
 | Go | checkout, product-catalog | `go.mod` | `ci/templates/lang-go.yml`, carried |
 | Node | frontend, payment | `package.json` | `ci/templates/lang-node.yml` |
 | .NET | accounting, cart | `Accounting.csproj`, `cart.sln` | `ci/templates/lang-dotnet.yml`, net-new |
-| Java | ad, fraud-detection | `build.gradle`, `build.gradle.kts` | Net-new |
+| Java | ad, fraud-detection | `build.gradle`, `build.gradle.kts` | `ci/templates/lang-java.yml`, net-new |
 | Python | product-reviews, recommendation | `requirements.txt` | `ci/templates/lang-python.yml`, net-new |
 | Rust | shipping | `Cargo.toml` | `ci/templates/lang-rust.yml` |
 | Ruby | email | `Gemfile` | `ci/templates/lang-ruby.yml`, net-new |
@@ -240,9 +246,7 @@ base images.
 | C++ | currency | `CMakeLists.txt` | `ci/templates/lang-cpp.yml`, net-new |
 | Elixir | flagd-ui | `mix.exs` | `ci/templates/lang-elixir.yml`, net-new |
 
-Nine tiers of ten have a template today. The other one has none. ADR-0017 selects the full
-justified project-built inventory as the programme target, so that tier is selected work;
-no schedule for it is claimed here.
+All ten tiers have a template today.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
 upstream binary with project-owned configuration, so no language-tier template applies to
@@ -272,13 +276,13 @@ language toolchain, driven by the manifest upstream ships.
 | Component | Manifest | Toolchain |
 |---|---|---|
 | accounting | `Accounting.csproj`, `Accounting.sln` | .NET SDK |
-| ad | `build.gradle` | Gradle |
+| ad | `build.gradle`, `settings.gradle`, `gradlew`, resolved under the project-generated `gradle.lockfile` | Gradle wrapper |
 | cart | `cart.sln`, `src/cart.csproj`, `Directory.Build.props`, `NuGet.config` | .NET SDK |
 | checkout | `go.mod` | Go |
 | currency | `CMakeLists.txt` | CMake |
 | email | `Gemfile` | Bundler |
 | flagd-ui | `mix.exs` | Mix |
-| fraud-detection | `build.gradle.kts`, `settings.gradle.kts`, `gradlew` | Gradle wrapper |
+| fraud-detection | `build.gradle.kts`, `settings.gradle.kts`, resolved under the project-generated `gradle.lockfile` | Gradle, from the builder image; the committed wrapper is not used |
 | frontend | `package.json` | npm |
 | payment | `package.json` | npm |
 | product-catalog | `go.mod` | Go |
@@ -328,9 +332,8 @@ has no repository in the platform registry, as `currency` does not, its publish 
 jobs stay unwired rather than pointing somewhere wrong. It is still wired through build and
 scan, because neither stage touches the registry.
 
-Three components have no per-service configuration. Two of them have a language tier with
-no template; accounting is the exception, because the .NET tier now has one and accounting
-is not yet wired to it. `frontend-proxy` and `image-provider` have no application
+One component has no per-service configuration: accounting, whose .NET tier has a template
+it is not yet wired to. `frontend-proxy` and `image-provider` have no application
 language, and each carries a per-service `ci.yml` regardless, because a container
 definition is enough to build, lint and scan.
 
@@ -340,17 +343,17 @@ definition is not at its service root. `services/currency/ci.yml` and the C++ ti
 it extends, `ci/templates/lang-cpp.yml`, are net-new as well, as are
 `services/product-reviews/ci.yml`, `services/recommendation/ci.yml` and the Python tier
 template they extend, `ci/templates/lang-python.yml`, `services/email/ci.yml` with the Ruby
-tier template, `ci/templates/lang-ruby.yml`, and `services/flagd-ui/ci.yml` with the Elixir tier
-template, `ci/templates/lang-elixir.yml`.
+tier template, `ci/templates/lang-ruby.yml`, `services/flagd-ui/ci.yml` with the Elixir tier
+template, `ci/templates/lang-elixir.yml`, and `services/ad/ci.yml` and
+`services/fraud-detection/ci.yml` with the Java tier template, `ci/templates/lang-java.yml`.
 
 ### Not implemented
 
 ADR-0017 selects the full justified project-built inventory as the target of an
-owner-selected end-to-end programme. Selection is not delivery, and .NET, C++, Python, Ruby and
-Elixir are the only tiers of that breadth implemented so far, so the following are recorded
-as not implemented:
+owner-selected end-to-end programme. Selection is not delivery. All six tiers that breadth adds, .NET, C++,
+Python, Ruby, Elixir and Java, now have a template, and accounting is not yet wired to its
+tier. Recorded as not implemented:
 
-- A language-tier template for Java.
 - Image size budgets.
 
 Net-new and now implemented, executed for checkout, shipping and quote, and since then for image-provider:
@@ -406,25 +409,26 @@ git show 2.2.0:LICENSE > ../out/LICENSE
 ```
 
 The comparison scope is `services/`, `pb/`, and `LICENSE`. Within that scope, comparing
-`../out` against this tree reports two kinds of difference and nothing else. Forty-four
+`../out` against this tree reports two kinds of difference and nothing else. Forty-six
 upstream-derived files differ in content: the twenty-two container definitions recorded as
-modified above, plus the twenty-two the preceding section records. Those twenty-two are what
-separates this result from the twenty-two figure, which counts modified container
-definitions only. The remaining three hundred and eight upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Twenty files
-are present here and absent upstream: the per-service `ci.yml` under `checkout`,
+modified above, plus the twenty-four the preceding section records. Those twenty-four are
+what separates this result from the twenty-two figure, which counts modified container
+definitions only. The remaining three hundred and six upstream-derived files in the scope
+are byte-identical, and no upstream file in the scope is missing here. Twenty-four files are
+present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
-`image-provider`, `cart`, `currency`, `product-reviews`, `recommendation`, `email`, and
-`flagd-ui`; `services/flagd-ui/test/fixtures/demo.flagd.json`, a verbatim copy of upstream's
-`src/flagd/demo.flagd.json` at the pinned tag carried as test data;
-`services/frontend/eslint.config.mjs`; and four lock files, `services/cart/src/packages.lock.json`,
-`services/quote/composer.lock` and the pip-generated `requirements.lock` under
-`services/product-reviews` and `services/recommendation`, which exist so the source gate has a
-declared dependency set to read. Those twenty are project-added, and the fixture is an
-unmodified upstream file, so no modification notice applies to any of them. The flat ESLint configuration is project-added rather
-than a modification because ESLint 9 reads flat configuration only and upstream ships none; the upstream
-`.eslintrc` beside it is retained unmodified and still counts among the byte-identical
-files.
+`image-provider`, `cart`, `currency`, `product-reviews`, `recommendation`, `email`,
+`flagd-ui`, `ad`, and `fraud-detection`; `services/flagd-ui/test/fixtures/demo.flagd.json`, a
+verbatim copy of upstream's `src/flagd/demo.flagd.json` at the pinned tag carried as test
+data; `services/frontend/eslint.config.mjs`; and six lock files,
+`services/cart/src/packages.lock.json`, `services/quote/composer.lock`, the pip-generated
+`requirements.lock` under `services/product-reviews` and `services/recommendation`, and the
+Gradle-generated `gradle.lockfile` under `services/ad` and `services/fraud-detection`, which
+give the source gate a declared dependency set to read. Those twenty-four are project-added,
+and the fixture is an unmodified upstream file, so no modification notice applies to any of
+them. The flat ESLint configuration is project-added rather than a modification because
+ESLint 9 reads flat configuration only and upstream ships none; the upstream `.eslintrc`
+beside it is retained unmodified and still counts among the byte-identical files.
 
 Those figures describe that comparison and nothing wider. Files outside `services/`, `pb/`,
 and `LICENSE` are not part of it and are not classified by these counts.
@@ -432,8 +436,10 @@ and `LICENSE` are not part of it and are not classified by these counts.
 Inside the same scope, the notice correspondence covers the modified upstream-derived
 container definitions, `services/checkout/main.go`, `services/product-catalog/main.go`,
 `services/shipping/src/shipping_service.rs`, the five modified `services/frontend/` source
-files, `services/cart/src/cart.csproj`, and `services/flagd-ui/mix.exs`. Every one of them that differs carries a
-modification notice, and every one carrying a notice differs. The `go.mod`, `go.sum`,
-`composer.json`, `package.json`, `package-lock.json`, `Gemfile.lock`, `.ruby-version` and `mix.lock`
-files are excluded for the reason given in the preceding section, and the table there is what records them. That correspondence is the check worth running, because it
-fails loudly if a change is made without recording it.
+files, `services/cart/src/cart.csproj`, `services/flagd-ui/mix.exs`,
+`services/ad/build.gradle`, and `services/fraud-detection/build.gradle.kts`. Every one of
+them that differs carries a modification notice, and every one carrying a notice differs. The
+`go.mod`, `go.sum`, `composer.json`, `package.json`, `package-lock.json`, `Gemfile.lock`,
+`.ruby-version` and `mix.lock` files are excluded for the reason given in the preceding
+section, and the table there is what records them. That correspondence is the check worth
+running, because it fails loudly if a change is made without recording it.
