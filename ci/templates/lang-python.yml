@@ -1,0 +1,19 @@
+# The Dockerfile's own base image, so no new image is trusted. Neither service declares a linter
+# or ships tests, so this asserts only that every .py file compiles under the image's Python:
+# nothing about imports, types or behaviour.
+
+.lang-python-template:
+  stage: lint
+  variables:
+    SERVICE_SHARED_INPUTS: "${SERVICE_PATH}/**/*"
+  image: python:3.12-alpine3.22
+  script:
+    - cd "${SERVICE_PATH}"
+    - python --version
+    # Written to a file and tested, not piped, so an empty list fails instead of passing.
+    - find . -name '*.py' > /tmp/py-files
+    - test -s /tmp/py-files
+    - cat /tmp/py-files
+    - python -m py_compile - < /tmp/py-files
+  rules:
+    - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/lang-python.yml"]

@@ -1,0 +1,58 @@
+# Declarative configuration for product-reviews; behaviour lives in ci/templates. No publish or
+# evidence job: product-reviews has no ECR repository and none is authorized.
+
+.product-reviews-vars: &product-reviews-vars
+  SERVICE_NAME: product-reviews
+  SERVICE_PATH: services/product-reviews
+  LANG_TIER: python
+
+product-reviews:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *product-reviews-vars
+
+product-reviews:lint-python:
+  extends: .lang-python-template
+  variables:
+    <<: *product-reviews-vars
+
+product-reviews:build:
+  extends: .image-build-template
+  variables:
+    <<: *product-reviews-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+product-reviews:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - product-reviews:build
+  variables:
+    <<: *product-reviews-vars
+
+# requirements.txt pins direct dependencies only. Their transitive set and the instrumentation
+# opentelemetry-bootstrap adds at build time are unpinned, and only the image scan reads them.
+product-reviews:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *product-reviews-vars
+
+# The database and LLM settings are required at startup but used only per request, so
+# placeholders let it listen alone. No real key or credential is set here.
+product-reviews:health-test:
+  extends: .image-health-template
+  dependencies:
+    - product-reviews:build
+  variables:
+    <<: *product-reviews-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e PRODUCT_REVIEWS_PORT=8080
+      -e OTEL_SERVICE_NAME=product-reviews
+      -e PRODUCT_CATALOG_ADDR=unused:8080
+      -e DB_CONNECTION_STRING=host=unused
+      -e LLM_HOST=unused
+      -e LLM_PORT=8080
+      -e LLM_BASE_URL=http://unused:8080/v1
+      -e LLM_MODEL=unused
+      -e OPENAI_API_KEY=unused

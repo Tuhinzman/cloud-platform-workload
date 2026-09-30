@@ -13,6 +13,7 @@ exist in a pipeline that does not also contain the blocking scan in front of it.
 import copy
 import glob
 import os
+import re
 import sys
 import unittest
 
@@ -375,6 +376,9 @@ class SourceDependencyGate(unittest.TestCase):
         self.assertTrue(any("scan-source" in e for e in errors), errors)
 
 
+EXACT_PIN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(\[[A-Za-z0-9._,-]+\])?==[A-Za-z0-9._+!]+")
+
+
 class LockBuildBinding(unittest.TestCase):
     """The source gate scans a lock file. These are the checks that keep the build from
     resolving something else, which would make the scan evidence for an artifact nobody
@@ -442,11 +446,18 @@ class LockBuildBinding(unittest.TestCase):
                 # failed on payment for exactly that reason the first time a Node service
                 # declared dependencies.
                 names = ("package-lock.json", "packages.lock.json", "composer.lock",
-                         "Cargo.lock", "go.sum", "poetry.lock", "Gemfile.lock", "mix.lock")
+                         "Cargo.lock", "go.sum", "poetry.lock", "Gemfile.lock", "mix.lock",
+                         "requirements.txt")
                 found = [m for name in names
                          for m in glob.glob(os.path.join(ROOT, "services", svc, "**", name), recursive=True)
                          if "node_modules" not in m and "/vendor/" not in m]
                 self.assertTrue(found, f"{svc} declares managed dependencies but commits no lock file")
+                # requirements.txt is the file the image installs, not a lock: it counts only while
+                # every line is an exact pin, because the scanner silently drops any other line.
+                for req in (m for m in found if m.endswith("requirements.txt")):
+                    loose = [line for line in (raw.split("#")[0].strip() for raw in open(req))
+                             if line and not EXACT_PIN.fullmatch(line)]
+                    self.assertEqual(loose, [], f"{req} carries requirements the source gate cannot see")
 
 
 HEALTH_TEMPLATE = ".image-health-template"

@@ -30,6 +30,7 @@ include:
   - local: ci/templates/lang-php.yml
   - local: ci/templates/lang-dotnet.yml
   - local: ci/templates/lang-cpp.yml
+  - local: ci/templates/lang-python.yml
   - local: ci/templates/image.yml
   - local: ci/templates/trivy-scan.yml
   - local: ci/templates/ecr-publish.yml
@@ -45,6 +46,8 @@ include:
   - local: services/image-provider/ci.yml
   - local: services/cart/ci.yml
   - local: services/currency/ci.yml
+  - local: services/product-reviews/ci.yml
+  - local: services/recommendation/ci.yml
 
 # GitLab's analyzer, a control separate from the image scanner; moved to lint (no test stage).
 secret_detection:

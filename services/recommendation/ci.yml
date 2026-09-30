@@ -1,0 +1,50 @@
+# Declarative configuration for recommendation; behaviour lives in ci/templates. No publish or
+# evidence job: recommendation has no ECR repository and none is authorized.
+
+.recommendation-vars: &recommendation-vars
+  SERVICE_NAME: recommendation
+  SERVICE_PATH: services/recommendation
+  LANG_TIER: python
+
+recommendation:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *recommendation-vars
+
+recommendation:lint-python:
+  extends: .lang-python-template
+  variables:
+    <<: *recommendation-vars
+
+recommendation:build:
+  extends: .image-build-template
+  variables:
+    <<: *recommendation-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+recommendation:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - recommendation:build
+  variables:
+    <<: *recommendation-vars
+
+# requirements.txt pins direct dependencies only. Their transitive set and the instrumentation
+# opentelemetry-bootstrap adds at build time are unpinned, and only the image scan reads them.
+recommendation:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *recommendation-vars
+
+recommendation:health-test:
+  extends: .image-health-template
+  dependencies:
+    - recommendation:build
+  variables:
+    <<: *recommendation-vars
+    HEALTH_PORT: "8080"
+    HEALTH_ENV: >-
+      -e RECOMMENDATION_PORT=8080
+      -e OTEL_SERVICE_NAME=recommendation
+      -e PRODUCT_CATALOG_ADDR=unused:8080
