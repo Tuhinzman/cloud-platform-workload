@@ -121,10 +121,10 @@ the pipeline harder to share than the problem it solves.
 
 ### Modified upstream files that are not container definitions
 
-The table above covers container definitions. Twenty upstream-derived files under
+The table above covers container definitions. Twenty-two upstream-derived files under
 `services/checkout/`, `services/product-catalog/`, `services/shipping/`,
-`services/quote/`, `services/frontend/`, `services/payment/`, `services/cart/`, and
-`services/email/` also differ from the pinned source, and they
+`services/quote/`, `services/frontend/`, `services/payment/`, `services/cart/`,
+`services/email/`, and `services/flagd-ui/` also differ from the pinned source, and they
 are recorded here so the modification inventory is not limited to container definitions. Those applications remain
 upstream work. What follows are corrections and dependency movement applied on top of them,
 not authorship of the services.
@@ -151,25 +151,27 @@ not authorship of the services.
 | `services/cart/src/cart.csproj` | Dependency metadata | `30c556a` moved `OpenTelemetry.Resources.Host` from `1.14.0-beta.1` to `1.16.0-beta.2`, the first published version carrying the fix for GHSA-v8pv-4842-x354, and changed nothing else. |
 | `services/email/Gemfile.lock` | Dependency metadata | Four gems moved within the unchanged `Gemfile` constraints to clear the HIGH and CRITICAL findings both scan gates reported: rack 3.1.15 to 3.1.22, rack-session 2.1.1 to 2.1.2, net-imap 0.5.8 to 0.5.15 and puma 7.1.0 to 7.2.1, resolved with `bundle update --conservative` under the locked Bundler 2.6.7. |
 | `services/email/.ruby-version` | Toolchain metadata | 3.4.7 to 3.4.11, matching the container definition's move to the first 3.4 release whose bundled gems carry the fixes. |
+| `services/flagd-ui/mix.exs` | Dependency metadata | bandit raised from `~> 1.10.0` to `~> 1.12.5` and req from `~> 0.5.16` to `~> 0.6.1`, the smallest constraints that clear the HIGH findings the source gate reported without taking bandit releases that carry newer HIGH advisories. The file carries a modification notice. |
+| `services/flagd-ui/mix.lock` | Dependency metadata | Re-resolved for those constraints, and six unused entries unlocked (cowboy, cowboy_telemetry, cowlib, opentelemetry_cowboy, opentelemetry_phoenix_live_view_process_propagator, ranch); fourteen packages moved, among them bandit 1.12.5, mint 1.11.0, phoenix 1.8.15, plug 1.20.3 and req 0.6.3. |
 
 Every dependency change above was made to move off modules a scan reported findings against:
 the image scan, which is the reason recorded in `a384c3d`, `bf07e2e`, `14d12f3`, and `1b4deb0`;
 the source gate, which is the reason recorded in `0463437`, `94eeedf`, `d2f3481`, and
-`30c556a`; both gates for the later frontend and payment moves; and both scan gates for the
-`services/email/` changes. Neither the changes nor this record claims any review of those
-dependencies beyond that.
+`30c556a`, and for the `services/flagd-ui/` changes; both gates for the later frontend and
+payment moves; and both scan gates for the `services/email/` changes. Neither the changes nor
+this record claims any review of those dependencies beyond that.
 
-Both `main.go` files, `shipping_service.rs`, the five `services/frontend/` source files and
-`cart.csproj` above carry an Apache-2.0 modification notice in the format described below.
-The `go.mod` and `go.sum` files, `composer.json`, the `package.json` and `package-lock.json`
-files, `Gemfile.lock` and `.ruby-version` carry none, and none is added. `Gemfile.lock` is
-rewritten whole by Bundler and `.ruby-version` holds a single version string, so neither can
-hold one. `go.sum` is a line-oriented checksum list with no comment syntax, and
-`composer.json`, `package.json` and `package-lock.json` are strict JSON, which rejects comments
-outright, so none of them can hold one. `go.mod` does support `//` comments, but neither copy
-carries an upstream copyright or licence header for a notice to sit beneath, and both are
-dependency metadata maintained by the Go toolchain rather than authored source. This table is
-the record of their modification.
+Both `main.go` files, `shipping_service.rs`, the five `services/frontend/` source files,
+`cart.csproj` and flagd-ui's `mix.exs` above carry an Apache-2.0 modification notice in the
+format described below. The `go.mod` and `go.sum` files, `composer.json`, the `package.json`
+and `package-lock.json` files, `Gemfile.lock`, `.ruby-version` and `mix.lock` carry none, and
+none is added. `Gemfile.lock` and `mix.lock` are rewritten whole by Bundler and Mix, and
+`.ruby-version` holds a single version string, so none of them can hold one. `go.sum` is a
+line-oriented checksum list with no comment syntax, and `composer.json`, `package.json` and
+`package-lock.json` are strict JSON, which rejects comments outright, so none of them can hold
+one. `go.mod` does support `//` comments, but neither copy carries an upstream copyright or
+licence header for a notice to sit beneath, and both are dependency metadata maintained by the
+Go toolchain rather than authored source. This table is the record of their modification.
 
 ### Hardening applied, by component
 
@@ -236,11 +238,11 @@ base images.
 | Ruby | email | `Gemfile` | `ci/templates/lang-ruby.yml`, net-new |
 | PHP | quote | `composer.json` | `ci/templates/lang-php.yml` |
 | C++ | currency | `CMakeLists.txt` | `ci/templates/lang-cpp.yml`, net-new |
-| Elixir | flagd-ui | `mix.exs` | Net-new |
+| Elixir | flagd-ui | `mix.exs` | `ci/templates/lang-elixir.yml`, net-new |
 
-Eight tiers of ten have a template today. The other two have none. ADR-0017 selects the
-full justified project-built inventory as the programme target, so those two tiers are
-selected work; no schedule for them is claimed here.
+Nine tiers of ten have a template today. The other one has none. ADR-0017 selects the full
+justified project-built inventory as the programme target, so that tier is selected work;
+no schedule for it is claimed here.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
 upstream binary with project-owned configuration, so no language-tier template applies to
@@ -255,7 +257,7 @@ and no service is claimed to have coverage it does not have.
 |---|---|---|
 | cart | `tests/CartServiceTests.cs`, `tests/cart.tests.csproj` | Unit, .NET, all three skipped upstream |
 | checkout | `money/money_test.go` | Unit, Go, one package only |
-| flagd-ui | `test/flagd_ui/storage_test.exs`, four controller tests under `test/flagd_ui_web/controllers/`, `test/test_helper.exs`, `config/test.exs` | Unit and controller, Elixir |
+| flagd-ui | `test/flagd_ui/storage_test.exs`, four controller tests under `test/flagd_ui_web/controllers/`, `test/test_helper.exs`, `config/test.exs` | Unit and controller, Elixir; the flag file `config/test.exs:30` reads is absent and ignored at the tag, so upstream's own `src/flagd/demo.flagd.json` is carried as test data and the eleven tests run |
 | frontend | `cypress.config.ts` with `Dockerfile.cypress` | Browser test harness configuration |
 | shipping | `#[cfg(test)]` module in `src/shipping_service.rs` | Unit, Rust |
 
@@ -326,7 +328,7 @@ has no repository in the platform registry, as `currency` does not, its publish 
 jobs stay unwired rather than pointing somewhere wrong. It is still wired through build and
 scan, because neither stage touches the registry.
 
-Four components have no per-service configuration. Three of them have a language tier with
+Three components have no per-service configuration. Two of them have a language tier with
 no template; accounting is the exception, because the .NET tier now has one and accounting
 is not yet wired to it. `frontend-proxy` and `image-provider` have no application
 language, and each carries a per-service `ci.yml` regardless, because a container
@@ -337,17 +339,18 @@ that declares `SERVICE_DOCKERFILE`, because cart is the only component whose con
 definition is not at its service root. `services/currency/ci.yml` and the C++ tier template
 it extends, `ci/templates/lang-cpp.yml`, are net-new as well, as are
 `services/product-reviews/ci.yml`, `services/recommendation/ci.yml` and the Python tier
-template they extend, `ci/templates/lang-python.yml`, and `services/email/ci.yml` with the Ruby
-tier template, `ci/templates/lang-ruby.yml`.
+template they extend, `ci/templates/lang-python.yml`, `services/email/ci.yml` with the Ruby
+tier template, `ci/templates/lang-ruby.yml`, and `services/flagd-ui/ci.yml` with the Elixir tier
+template, `ci/templates/lang-elixir.yml`.
 
 ### Not implemented
 
 ADR-0017 selects the full justified project-built inventory as the target of an
-owner-selected end-to-end programme. Selection is not delivery, and .NET, C++, Python and Ruby
-are the only tiers of that breadth implemented so far, so the following are recorded as not
-implemented:
+owner-selected end-to-end programme. Selection is not delivery, and .NET, C++, Python, Ruby and
+Elixir are the only tiers of that breadth implemented so far, so the following are recorded
+as not implemented:
 
-- Language-tier templates for Java and Elixir.
+- A language-tier template for Java.
 - Image size budgets.
 
 Net-new and now implemented, executed for checkout, shipping and quote, and since then for image-provider:
@@ -403,20 +406,22 @@ git show 2.2.0:LICENSE > ../out/LICENSE
 ```
 
 The comparison scope is `services/`, `pb/`, and `LICENSE`. Within that scope, comparing
-`../out` against this tree reports two kinds of difference and nothing else. Forty-two
+`../out` against this tree reports two kinds of difference and nothing else. Forty-four
 upstream-derived files differ in content: the twenty-two container definitions recorded as
-modified above, plus the twenty the preceding section records. Those twenty are what
+modified above, plus the twenty-two the preceding section records. Those twenty-two are what
 separates this result from the twenty-two figure, which counts modified container
-definitions only. The remaining three hundred and ten upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Eighteen files
+definitions only. The remaining three hundred and eight upstream-derived files in the
+scope are byte-identical, and no upstream file in the scope is missing here. Twenty files
 are present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
-`image-provider`, `cart`, `currency`, `product-reviews`, `recommendation`, and `email`;
+`image-provider`, `cart`, `currency`, `product-reviews`, `recommendation`, `email`, and
+`flagd-ui`; `services/flagd-ui/test/fixtures/demo.flagd.json`, a verbatim copy of upstream's
+`src/flagd/demo.flagd.json` at the pinned tag carried as test data;
 `services/frontend/eslint.config.mjs`; and four lock files, `services/cart/src/packages.lock.json`,
 `services/quote/composer.lock` and the pip-generated `requirements.lock` under
 `services/product-reviews` and `services/recommendation`, which exist so the source gate has a
-declared dependency set to read. Those eighteen are project-added with no upstream origin, so
-no modification notice applies to them. The flat ESLint configuration is project-added rather
+declared dependency set to read. Those twenty are project-added, and the fixture is an
+unmodified upstream file, so no modification notice applies to any of them. The flat ESLint configuration is project-added rather
 than a modification because ESLint 9 reads flat configuration only and upstream ships none; the upstream
 `.eslintrc` beside it is retained unmodified and still counts among the byte-identical
 files.
@@ -427,8 +432,8 @@ and `LICENSE` are not part of it and are not classified by these counts.
 Inside the same scope, the notice correspondence covers the modified upstream-derived
 container definitions, `services/checkout/main.go`, `services/product-catalog/main.go`,
 `services/shipping/src/shipping_service.rs`, the five modified `services/frontend/` source
-files, and `services/cart/src/cart.csproj`. Every one of them that differs carries a
+files, `services/cart/src/cart.csproj`, and `services/flagd-ui/mix.exs`. Every one of them that differs carries a
 modification notice, and every one carrying a notice differs. The `go.mod`, `go.sum`,
-`composer.json`, `package.json`, `package-lock.json`, `Gemfile.lock` and `.ruby-version` files
-are excluded for the reason given in the preceding section, and the table there is what records them. That correspondence is the check worth running, because it
+`composer.json`, `package.json`, `package-lock.json`, `Gemfile.lock`, `.ruby-version` and `mix.lock`
+files are excluded for the reason given in the preceding section, and the table there is what records them. That correspondence is the check worth running, because it
 fails loudly if a change is made without recording it.

@@ -23,10 +23,12 @@ than an exception: it binds its gRPC port before anything external is needed. Wh
 does not cover is recorded with it - the Charge handler reaches flagd per request, so the
 application path beyond the health service is not validated in CI.
 currency, product-reviews, recommendation and email carry build, both security gates, SBOM
-and container health with no publication stage. Evidence for the remaining four components
-is unpopulated until the corresponding implementation and validation have actually
-occurred. Wiring is not execution, publication is not runtime evidence, and none of this is
-fleet-wide delivery: four components have no pipeline configuration at all. Identity and classification are facts
+and container health with no publication stage. flagd-ui carries build, both security gates,
+SBOM and its eleven upstream tests, with container health deferred to runtime and no
+publication stage. Evidence for the remaining three components is unpopulated until the
+corresponding implementation and validation have actually occurred. Wiring is not
+execution, publication is not runtime evidence, and none of this is fleet-wide delivery:
+three components have no pipeline configuration at all. Identity and classification are facts
 about the source and are populated independently of that evidence.
 
 Five classes. Every component belongs to exactly one, and the class decides what evidence
@@ -71,16 +73,16 @@ Ten tiers, discovered by inspecting pinned source rather than inferred from base
 | Ruby | email | `ci/templates/lang-ruby.yml`, net-new |
 | PHP | quote | `ci/templates/lang-php.yml`, net-new |
 | C++ | currency | `ci/templates/lang-cpp.yml`, net-new |
-| Elixir | flagd-ui | Net-new |
+| Elixir | flagd-ui | `ci/templates/lang-elixir.yml`, net-new |
 
-Eight tiers of ten have a template today. Eleven services are wired to the pipeline. Four
-are not: three because their tier has no template, and accounting because its .NET tier has
-one and it has not been wired to it. Thirteen components are wired in total, the two
+Nine tiers of ten have a template today. Twelve services are wired to the pipeline. Three
+are not: two because their tier has no template, and accounting because its .NET tier has
+one and it has not been wired to it. Fourteen components are wired in total, the two
 configured components in section 2 included. ADR-0017 selects the full justified
 project-built inventory as the target of an owner-selected end-to-end programme, so the
-remaining two tiers are selected work rather than work ruled out. .NET was the first of the
-six to be implemented, C++ the second, Python the third and Ruby the fourth, and nothing
-here says those components are delivered.
+remaining tier is selected work rather than work ruled out. .NET was the first of the six to
+be implemented, C++ the second, Python the third, Ruby the fourth and Elixir the fifth, and
+nothing here says those components are delivered.
 
 ## 2. Project-Built Configured Components
 
@@ -140,7 +142,8 @@ exception. It simply does not run.
 
 ## Container Health Disposition
 
-All thirteen wired components prove container health in CI. Two reach their listening state
+Thirteen of the fourteen wired components prove container health in CI, and flagd-ui's is
+deferred to runtime: a deferred entry is not a pass and not runtime evidence. Two reach their listening state
 only after a startup dependency answers, so their health job starts that dependency beside
 them as a digest-pinned fixture on a job-private network. That proves the image starts
 against the dependency it needs; it is not runtime readiness, and the readiness obligation
@@ -159,6 +162,7 @@ product-catalog's managed database are separate decisions.
 | checkout, quote, shipping, frontend-proxy, image-provider, payment, frontend, currency, product-reviews, recommendation, email | validated in CI |
 | cart | validated in CI against an ephemeral fixture: Valkey 9.0.1 from the upstream chart, because `Program.cs:98` resolves ValkeyCartStore before `app.Run()` and `ValkeyCartStore.cs:101` throws without it |
 | product-catalog | validated in CI against an ephemeral fixture: PostgreSQL 17.11, the Dev datastore's engine version, with trust authentication and no schema, because `main()` calls `initDatabase()` before the listener and exits 1 without it |
+| flagd-ui | health: deferred to runtime — `application.ex:20` starts `FlagdUi.Storage` before the endpoint and `storage.ex:23` reads `/app/data/demo.flagd.json`, which its pod mounts, so without that file the release exits 1 before listening |
 
 ## Dependency Scanning Coverage
 
@@ -184,9 +188,11 @@ varies by language rather than by packaging. Measured at the current anchor:
 | product-reviews | Python | 62, from the installed venv and the base image's pip | 71: 60 from `requirements.lock`, 11 from `requirements.txt` |
 | recommendation | Python | 40, from the installed venv and the base image's pip | 46: 38 from `requirements.lock`, 8 from `requirements.txt` |
 | email | Ruby | the bundle's gems and the gems shipped with Ruby, read from their gemspecs | 90, from `Gemfile.lock` |
+| flagd-ui | Elixir | none: Debian packages only; the Hex dependencies and the bundled OTP runtime are not visible | 54, from `mix.lock` |
 
-Three of the thirteen carry no managed dependency into the image at all. For shipping and cart
-the source pass is the only dependency coverage there is; currency has neither:
+Four of the fourteen carry no managed dependency into the image at all. For shipping, cart
+and flagd-ui the source pass is the only dependency coverage there is, and flagd-ui's bundled
+OTP runtime is read by neither scan; currency has neither:
 opentelemetry-cpp is cloned at a release tag and compiled into the image, and neither scan
 reads it. product-reviews and recommendation install under a pip-generated
 `requirements.lock`; Trivy's pip analyzer reads only files named `requirements.txt`, so a
@@ -214,10 +220,10 @@ reported and not hidden.
 Sixteen items. No component carries the full set: checkout, shipping and quote carry
 most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
 items but none of the runtime ones, frontend-proxy carries its pipeline configuration
-alone, cart, payment, frontend, product-catalog, currency, product-reviews, recommendation
-and email each carry their pipeline configuration and an executed build, both security gates
-and an SBOM with no publication or runtime behind them, and the remaining four components
-carry none.
+alone, cart, payment, frontend, product-catalog, currency, product-reviews, recommendation,
+email and flagd-ui each carry their pipeline configuration and an executed build, both
+security gates and an SBOM with no publication or runtime behind them, and the remaining
+three components carry none.
 Upstream or external image origin, classification, modification record, container
 definition or image source, reusable pipeline configuration where project-built, build
 result where project-built, current scan result, SBOM where project-built, registry digest,
