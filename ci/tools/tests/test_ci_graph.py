@@ -667,7 +667,7 @@ def inspect_stub(control, service):
 
 class RunningMode(unittest.TestCase):
     """A worker that never listens passes only by staying up, and only after the job has shown
-    that an exited container reads as stopped."""
+    that a container that aborts reads as stopped."""
 
     STEP = 'if [ "${HEALTH_MODE}" = running ]; then'
 
@@ -686,7 +686,17 @@ class RunningMode(unittest.TestCase):
     def test_a_control_that_still_reads_running_fails_the_job(self):
         r = run_with_stubs(template_step(self.STEP), inspect_stub("true", "true 0"), HEALTH_MODE=RUNNING)
         self.assertEqual(r.returncode, 1)
-        self.assertIn("exited control still reads as running", r.stdout)
+        self.assertIn("aborted control still reads as running", r.stdout)
+
+    def test_the_worker_and_the_control_both_run_under_an_init(self):
+        """As PID 1 an aborting process is left running: measured, accounting's unhandled
+        exception left its container running without --init and exited 134 with it."""
+        runs = [line.strip() for line in template_step(self.STEP).splitlines()
+                if line.strip().startswith("docker run")]
+        self.assertEqual(len(runs), 2)
+        for line in runs:
+            with self.subTest(run=line):
+                self.assertIn(" --init ", line)
 
     def test_removing_the_exit_control_is_caught(self):
         """The negative control: without the check, a daemon that reports every container as

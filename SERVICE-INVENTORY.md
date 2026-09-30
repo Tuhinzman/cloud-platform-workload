@@ -148,7 +148,9 @@ stays open until a runtime window answers it. Every port probe first starts a co
 listens on nothing on the same port and must read it as closed, so where a proxy answers for
 published ports the job fails instead of passing a service it cannot prove. A worker that never
 listens is checked in a running mode that proves only that the process stays up for a bounded
-time beside a control that exits at once; no component uses that mode yet. The fixtures take
+time beside a control that aborts itself at once. Both run under an init process, because as
+PID 1 a process that aborts, as .NET does on an unhandled exception, is left running rather
+than exited. No component uses that mode yet. The fixtures take
 no credential and no data, and they are not the runtime dependency: cart's cache form and
 product-catalog's managed database are separate decisions.
 

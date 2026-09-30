@@ -109,14 +109,15 @@
           exit 1
         fi
       fi
-    # The control exits at once; if it still reads as running, so could a crashed service.
+    # Both run under --init: as PID 1 a process that aborts, as .NET does on an unhandled exception,
+    # is left running. The control aborts itself; if it still reads as running, so could a crash.
     - |
       if [ "${HEALTH_MODE}" = running ]; then
-        docker run -d --name "${SERVICE_NAME}-health" ${HEALTH_DEPENDENCY_IMAGE:+--network health-net} ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
-        docker run -d --name health-exit-control "${HEALTH_CONTROL_IMAGE}" true
+        docker run -d --init --name "${SERVICE_NAME}-health" ${HEALTH_DEPENDENCY_IMAGE:+--network health-net} ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
+        docker run -d --init --name health-exit-control "${HEALTH_CONTROL_IMAGE}" sh -c 'kill -ABRT $$; sleep 600'
         sleep "${HEALTH_RUNNING_SECONDS}"
         if [ "$(docker inspect -f '{{.State.Running}}' health-exit-control)" != "false" ]; then
-          echo "FAIL: the exited control still reads as running, so this check cannot tell"
+          echo "FAIL: the aborted control still reads as running, so this check cannot tell"
           exit 1
         fi
         docker logs "${SERVICE_NAME}-health"
