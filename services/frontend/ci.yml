@@ -1,6 +1,5 @@
-# Declarative configuration for frontend. Behaviour lives in ci/templates.
-#
-# No publish or evidence job: frontend has no ECR repository and none is authorized.
+# Declarative configuration for frontend; behaviour lives in ci/templates. Only the ECR
+# repository name is set here: the account-bearing registry host is a masked project variable.
 
 .frontend-vars: &frontend-vars
   SERVICE_NAME: frontend
@@ -37,7 +36,7 @@ frontend:scan-image:
 # Next.js standalone reads PORT and binds HOSTNAME; without HOSTNAME it listens on the
 # container hostname only and the port check cannot reach it.
 frontend:health-test:
-  extends: .image-health-template
+  extends: .image-health-publisher-template
   dependencies:
     - frontend:build
   variables:
@@ -46,3 +45,28 @@ frontend:health-test:
     HEALTH_ENV: >-
       -e PORT=8080
       -e HOSTNAME=0.0.0.0
+
+frontend:publish:
+  extends: .ecr-publish-template
+  # Both scans are required needs: GitLab refuses a pipeline that would publish unscanned.
+  needs:
+    - job: frontend:build
+    - job: frontend:scan-image
+      artifacts: false
+    - job: frontend:scan-source
+      artifacts: false
+    - job: frontend:health-test
+      artifacts: false
+  variables:
+    <<: *frontend-vars
+    ECR_REPOSITORY: astroshop/frontend
+
+frontend:retain-evidence:
+  extends: .evidence-retain-template
+  needs:
+    - job: frontend:scan-image
+    - job: frontend:scan-source
+      artifacts: false
+    - job: frontend:publish
+  variables:
+    <<: *frontend-vars

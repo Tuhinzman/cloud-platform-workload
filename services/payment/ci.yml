@@ -1,5 +1,5 @@
-# Declarative configuration for payment; behaviour lives in ci/templates. No publish or
-# evidence job: payment has no ECR repository and none is authorized.
+# Declarative configuration for payment; behaviour lives in ci/templates. Only the ECR
+# repository name is set here: the account-bearing registry host is a masked project variable.
 
 .payment-vars: &payment-vars
   SERVICE_NAME: payment
@@ -43,7 +43,7 @@ payment:scan-image:
 # payment binds its port before needing anything external; flagd is reached only per Charge
 # request, so no dependency container is needed.
 payment:health-test:
-  extends: .image-health-template
+  extends: .image-health-publisher-template
   dependencies:
     - payment:build
   variables:
@@ -51,3 +51,28 @@ payment:health-test:
     HEALTH_PORT: "8080"
     HEALTH_ENV: >-
       -e PAYMENT_PORT=8080
+
+payment:publish:
+  extends: .ecr-publish-template
+  # Both scans are required needs: GitLab refuses a pipeline that would publish unscanned.
+  needs:
+    - job: payment:build
+    - job: payment:scan-image
+      artifacts: false
+    - job: payment:scan-source
+      artifacts: false
+    - job: payment:health-test
+      artifacts: false
+  variables:
+    <<: *payment-vars
+    ECR_REPOSITORY: astroshop/payment
+
+payment:retain-evidence:
+  extends: .evidence-retain-template
+  needs:
+    - job: payment:scan-image
+    - job: payment:scan-source
+      artifacts: false
+    - job: payment:publish
+  variables:
+    <<: *payment-vars

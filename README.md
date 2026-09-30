@@ -63,8 +63,10 @@ The pipeline now has shared templates for Go, Node, PHP, Rust and .NET, but vali
 coverage is not uniform across the fleet. Checkout has an executed and passing
 Dockerfile lint path. Shipping and quote have executed validated build, scan, SBOM, and
 container health paths. Frontend, payment, and product-catalog are wired through build,
-image and source scans and a container health job, with no publication stage, and each
-has passed its merge-request pipeline; frontend and payment pass the health check.
+image and source scans and a container health job, and each has passed its merge-request
+pipeline; frontend and payment pass the health check. Frontend and payment also carry the
+manual publish and evidence jobs on main and have published nothing; product-catalog has no
+publication stage.
 frontend-proxy and image-provider are wired through the
 same shared templates for build, scan, SBOM and container health; neither carries a
 language tier, because neither directory holds application source. cart is wired through

@@ -12,9 +12,10 @@ bundle the pipeline retained itself, shipping first and then image-provider. fro
 is wired for build, scan, SBOM and container health and has published nothing. cart has
 executed build, scan and SBOM on a pipeline that passed, defers container health to
 runtime, and has published nothing: no registry repository, no digest, no promotion, no
-runtime. payment and frontend each carry build, both security gates, SBOM and container
-health; product-catalog carries all of those but defers container health to runtime. None
-of the four has published anything, for the same reason cart has not. frontend additionally returned
+runtime. payment and frontend each carry build, both security gates, SBOM, container
+health and the manual publish and evidence jobs on main; product-catalog carries all of
+those but the publication jobs and defers container health to runtime. None of the four has
+published anything. frontend additionally returned
 HTTP 200 with rendered HTML and served the `/_next/` assets that page referenced; that is a
 bounded startup and static-asset result, not a check of any backend call it would make. Its container health is a real result rather
 than an exception: it binds its gRPC port before anything external is needed. What that
