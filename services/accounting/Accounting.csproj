@@ -1,3 +1,5 @@
+<!-- Modified from the upstream OpenTelemetry Demo release 2.2.0. -->
+<!-- Change: six OpenTelemetry packages that OpenTelemetry.AutoInstrumentation brings in are referenced directly at fixed versions to clear the dependency audit and source gate findings. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
@@ -20,6 +22,14 @@
 		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
 		<PackageReference Include="OpenTelemetry.AutoInstrumentation" Version="1.13.0" />
+		<!-- Packages OpenTelemetry.AutoInstrumentation brings in, raised to fixed versions. Host's fix needs
+		     the 1.16.0 SDK, whose internals the Console and OTLP exporters use, so both match it. -->
+		<PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.16.0" />
+		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+		<PackageReference Include="OpenTelemetry.Exporter.Zipkin" Version="1.15.3" />
+		<PackageReference Include="OpenTelemetry.Extensions.Propagators" Version="1.15.3" />
+		<PackageReference Include="OpenTelemetry.Resources.Azure" Version="1.15.1-beta.1" />
+		<PackageReference Include="OpenTelemetry.Resources.Host" Version="1.16.0-beta.2" />
 	</ItemGroup>
 
 	<ItemGroup>
