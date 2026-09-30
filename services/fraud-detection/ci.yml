@@ -39,13 +39,15 @@ fraud-detection:scan-source:
   variables:
     <<: *fraud-detection-vars
 
+# A Kafka consumer that never listens (main.kt polls in a loop and opens no server socket), so
+# the running mode applies. KAFKA_ADDR must resolve: an unresolvable address makes the consumer
+# constructor at main.kt:48 throw and the process exit 1; localhost resolves and has no broker.
 fraud-detection:health-test:
   extends: .image-health-template
-  dependencies: []
+  dependencies:
+    - fraud-detection:build
   variables:
     <<: *fraud-detection-vars
-    HEALTH_MODE: deferred-to-runtime
-    HEALTH_REASON: >-
-      a Kafka consumer with no listener: it opens no TCP socket even while running against a
-      resolvable closed broker, and an unresolvable KAFKA_ADDR fails the consumer constructor
-      at main.kt:48 and exits 1
+    HEALTH_MODE: running
+    HEALTH_ENV: >-
+      -e KAFKA_ADDR=localhost:9092

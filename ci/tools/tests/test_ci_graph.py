@@ -593,7 +593,7 @@ class DeferredHealth(unittest.TestCase):
         listen would hide a failing probe, so each user is a recorded decision."""
         config = ci_graph.load_config(ROOT)
         running = {j.split(":")[0] for j in health_jobs() if health_mode(config, j) == RUNNING}
-        self.assertEqual(running, set())
+        self.assertEqual(running, {"fraud-detection"})
 
     def test_the_deferred_set_is_the_measured_one_only(self):
         """Deferring is a claim about a service, not a way past a failing probe. cart and
