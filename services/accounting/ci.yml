@@ -14,8 +14,8 @@ accounting:lint-dockerfile:
   variables:
     <<: *accounting-vars
 
-# Service-local by necessity: Accounting.csproj compiles src/protos/demo.proto, which exists
-# only where Dockerfile line 12 copies it from pb/. This repeats that copy and nothing else.
+# Service-local: unlike cart, whose csproj reads pb/ itself, Accounting.csproj compiles
+# src/protos/demo.proto, which only Dockerfile line 12 puts there. This repeats that copy only.
 accounting:lint-dotnet:
   extends: .lang-dotnet-template
   before_script:
