@@ -3,6 +3,8 @@
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout. TLS libraries upgraded and application directories given explicit read permissions.
+# Change: libuuid upgraded beside the TLS libraries. The base ships 2.41-r9, against which the
+# image scan reports six fixable HIGH util-linux findings; nothing else in the base is upgraded.
 
 FROM docker.io/library/python:3.12-alpine3.22 AS build-venv
 
@@ -18,7 +20,7 @@ RUN venv/bin/opentelemetry-bootstrap -a install
 
 FROM docker.io/library/python:3.12-alpine3.22
 
-RUN apk upgrade --no-cache libcrypto3 libssl3
+RUN apk upgrade --no-cache libcrypto3 libssl3 libuuid
 
 COPY --from=build-venv /venv/ /venv/
 
