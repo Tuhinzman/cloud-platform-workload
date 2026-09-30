@@ -53,7 +53,8 @@
 # HEALTH_ENV is unquoted so each service supplies its own environment. deferred-to-runtime
 # records a measured reason and succeeds without validating health; runtime readiness is owed.
 # A service that cannot listen until a startup dependency answers names a digest-pinned fixture:
-# it runs beside the service on a job-private network and is never runtime evidence.
+# it runs beside the service on a job-private network and is never runtime evidence. running is
+# for a worker that never listens: it proves the process stays up, not that it works.
 .image-health-template:
   extends: .docker-dind
   stage: health-test
@@ -63,10 +64,13 @@
     HEALTH_DEPENDENCY_IMAGE: ""
     HEALTH_DEPENDENCY_ENV: ""
     HEALTH_DEPENDENCY_READY: ""
+    HEALTH_RUNNING_SECONDS: "30"
+    # Runs the job's own negative controls: a container that listens on nothing, and one that exits.
+    HEALTH_CONTROL_IMAGE: alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
   script:
     - |
       case "${HEALTH_MODE}" in
-        validated-in-ci) ;;
+        validated-in-ci|running) ;;
         deferred-to-runtime)
           if [ -z "${HEALTH_REASON}" ]; then
             echo "FAIL: HEALTH_MODE=deferred-to-runtime requires HEALTH_REASON"
@@ -105,6 +109,34 @@
           exit 1
         fi
       fi
+    # The control exits at once; if it still reads as running, so could a crashed service.
+    - |
+      if [ "${HEALTH_MODE}" = running ]; then
+        docker run -d --name "${SERVICE_NAME}-health" ${HEALTH_DEPENDENCY_IMAGE:+--network health-net} ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
+        docker run -d --name health-exit-control "${HEALTH_CONTROL_IMAGE}" true
+        sleep "${HEALTH_RUNNING_SECONDS}"
+        if [ "$(docker inspect -f '{{.State.Running}}' health-exit-control)" != "false" ]; then
+          echo "FAIL: the exited control still reads as running, so this check cannot tell"
+          exit 1
+        fi
+        docker logs "${SERVICE_NAME}-health"
+        if [ "$(docker inspect -f '{{.State.Running}} {{.RestartCount}}' "${SERVICE_NAME}-health")" != "true 0" ]; then
+          echo "FAIL: ${SERVICE_NAME} did not stay running for ${HEALTH_RUNNING_SECONDS} s"
+          exit 1
+        fi
+        echo "RUNNING, NOT FUNCTIONAL HEALTH: ${SERVICE_NAME} stayed up ${HEALTH_RUNNING_SECONDS} s without listening"
+        exit 0
+      fi
+    # The probe must first read a container that listens on nothing, on the same port, as closed;
+    # where a proxy answers for published ports, nc -z would pass anything.
+    - |
+      docker run -d --name health-probe-control -p "${HEALTH_PORT}:${HEALTH_PORT}" "${HEALTH_CONTROL_IMAGE}" sleep 60
+      sleep 2
+      if nc -z -w 3 docker "${HEALTH_PORT}"; then
+        echo "FAIL: the probe reached a port nothing listens on, so it cannot prove listening here"
+        exit 1
+      fi
+      docker rm -f health-probe-control
     - docker run -d --name "${SERVICE_NAME}-health" ${HEALTH_DEPENDENCY_IMAGE:+--network health-net} -p "${HEALTH_PORT}:${HEALTH_PORT}" ${HEALTH_ENV} "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}"
     - |
       for i in $(seq 1 30); do
@@ -115,7 +147,7 @@
     - test "$(docker inspect -f '{{.State.Running}}' "${SERVICE_NAME}-health")" = "true"
     - docker logs "${SERVICE_NAME}-health"
   after_script:
-    - docker rm -f "${SERVICE_NAME}-health" health-dependency || true
+    - docker rm -f "${SERVICE_NAME}-health" health-dependency health-probe-control health-exit-control || true
     - docker network rm health-net || true
   rules:
     - changes: ["${SERVICE_PATH}/**/*", "${SERVICE_SHARED_INPUTS}", "ci/templates/image.yml"]

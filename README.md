@@ -74,8 +74,9 @@ the shared templates for Dockerfile lint, .NET lint, tests, build, scan and SBOM
 three upstream tests all carry a skip, so that job asserts nothing today. Its container
 health job, like product-catalog's, starts the dependency the process needs before it can
 listen as a digest-pinned fixture beside it, Valkey for cart and PostgreSQL for
-product-catalog, so the probe is a real startup result; runtime readiness remains owed. currency is wired for Dockerfile lint, C++ static analysis, build, image and source
-scans and a container health job, with no publication stage; upstream ships no tests for it.
+product-catalog, so the probe is a real startup result; runtime readiness remains owed.
+currency is wired for Dockerfile lint, C++ static analysis, build, image and source scans
+and a container health job, with no publication stage; upstream ships no tests for it.
 The product-catalog Go lint job is now configured as blocking and its latest
 validated run reports no findings. payment declares no linter and no TypeScript, so it
 extends a Node parse check rather than a lint, which asserts only that every `.js` file

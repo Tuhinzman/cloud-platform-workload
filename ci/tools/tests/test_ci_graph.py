@@ -453,6 +453,7 @@ HEALTH_TEMPLATE = ".image-health-template"
 HEALTH_PUBLISHER_TEMPLATE = ".image-health-publisher-template"
 DEFERRED = "deferred-to-runtime"
 VALIDATED = "validated-in-ci"
+RUNNING = "running"
 
 
 def health_jobs():
@@ -516,7 +517,18 @@ class DeferredHealth(unittest.TestCase):
         config = ci_graph.load_config(ROOT)
         for job in sorted(health_jobs()):
             with self.subTest(job=job):
-                self.assertIn(health_mode(config, job), {VALIDATED, DEFERRED})
+                self.assertIn(health_mode(config, job), {VALIDATED, RUNNING, DEFERRED})
+
+    def test_running_mode_passes_the_dispatch_silently(self):
+        r = run_dispatch(HEALTH_MODE=RUNNING)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, ""))
+
+    def test_the_running_set_is_the_measured_one_only(self):
+        """running is for a worker that never listens; using it for a service that should
+        listen would hide a failing probe, so each user is a recorded decision."""
+        config = ci_graph.load_config(ROOT)
+        running = {j.split(":")[0] for j in health_jobs() if health_mode(config, j) == RUNNING}
+        self.assertEqual(running, set())
 
     def test_the_deferred_set_is_the_measured_one_only(self):
         """Deferring is a claim about a service, not a way past a failing probe. cart and
@@ -561,11 +573,11 @@ class DeferredHealth(unittest.TestCase):
 
     def test_every_publisher_validates_health_in_ci(self):
         """A deferral records that CI did not validate health, so it cannot sit in front of a
-        publish."""
+        publish; running is the check a non-listening worker can pass."""
         config = ci_graph.load_config(ROOT)
         for svc in sorted(publishers()):
             with self.subTest(service=svc):
-                self.assertEqual(health_mode(config, f"{svc}:health-test"), VALIDATED)
+                self.assertIn(health_mode(config, f"{svc}:health-test"), {VALIDATED, RUNNING})
 
     def test_every_dependency_fixture_is_pinned_and_declares_readiness(self):
         """A fixture is a claim that the service cannot listen without it, so the set of users
@@ -594,6 +606,8 @@ class DeferredHealth(unittest.TestCase):
             with self.subTest(service=svc):
                 if health_mode(config, job) == DEFERRED:
                     self.assertRegex(text, rf"{svc}[^|]*\|[^|]*health: deferred to runtime")
+                elif health_mode(config, job) == RUNNING:
+                    self.assertRegex(text, rf"{svc}[^|]*\|[^|]*running in CI, not functional health")
                 elif variables.get("HEALTH_DEPENDENCY_IMAGE"):
                     self.assertRegex(text, rf"{svc}[^|]*\|[^|]*validated in CI against an ephemeral fixture")
 
@@ -618,6 +632,103 @@ def run_fixture_step(step, docker_stub=False, **env):
             path = tmp + os.pathsep + path
         return subprocess.run(["sh", "-c", step], capture_output=True, text=True,
                               env={"PATH": path, **env})
+
+
+def template_step(fragment):
+    config = ci_graph.load_config(ROOT)
+    found = [s for s in ci_graph.resolve(config, HEALTH_TEMPLATE)["script"] if fragment in s]
+    assert len(found) == 1, (fragment, len(found))
+    return found[0]
+
+
+def run_with_stubs(step, docker, nc="exit 1", **env):
+    """Run a template step with docker and nc replaced by shell stubs; the stub for docker
+    receives its arguments, so it can answer inspect calls per container."""
+    import subprocess, tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, body in (("docker", docker), ("nc", nc)):
+            path = os.path.join(tmp, name)
+            with open(path, "w") as handle:
+                handle.write("#!/bin/sh\n" + body + "\n")
+            os.chmod(path, 0o700)
+        base = {"PATH": tmp + os.pathsep + os.environ["PATH"], "SERVICE_NAME": "svc",
+                "CI_COMMIT_SHORT_SHA": "x", "HEALTH_PORT": "8080", "HEALTH_RUNNING_SECONDS": "0",
+                "HEALTH_CONTROL_IMAGE": "img@sha256:" + "0" * 64}
+        return subprocess.run(["sh", "-c", step], capture_output=True, text=True, env={**base, **env})
+
+
+def inspect_stub(control, service):
+    return ('case "$*" in\n'
+            f'  *health-exit-control*) echo {control} ;;\n'
+            f'  *"State.Running}}}} {{{{.RestartCount"*) echo "{service}" ;;\n'
+            '  *) exit 0 ;;\n'
+            'esac')
+
+
+class RunningMode(unittest.TestCase):
+    """A worker that never listens passes only by staying up, and only after the job has shown
+    that an exited container reads as stopped."""
+
+    STEP = 'if [ "${HEALTH_MODE}" = running ]; then'
+
+    def test_a_worker_that_stays_up_passes_and_says_what_it_proved(self):
+        r = run_with_stubs(template_step(self.STEP), inspect_stub("false", "true 0"), HEALTH_MODE=RUNNING)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("RUNNING, NOT FUNCTIONAL HEALTH", r.stdout)
+
+    def test_a_worker_that_exited_or_restarted_fails(self):
+        for state in ("false 0", "true 1", "false 1"):
+            with self.subTest(state=state):
+                r = run_with_stubs(template_step(self.STEP), inspect_stub("false", state), HEALTH_MODE=RUNNING)
+                self.assertEqual(r.returncode, 1)
+                self.assertIn("did not stay running", r.stdout)
+
+    def test_a_control_that_still_reads_running_fails_the_job(self):
+        r = run_with_stubs(template_step(self.STEP), inspect_stub("true", "true 0"), HEALTH_MODE=RUNNING)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("exited control still reads as running", r.stdout)
+
+    def test_removing_the_exit_control_is_caught(self):
+        """The negative control: without the check, a daemon that reports every container as
+        running would let a crashed worker pass."""
+        step = template_step(self.STEP)
+        start = step.index('  if [ "$(docker inspect -f \'{{.State.Running}}\' health-exit-control)"')
+        end = step.index("  fi", start) + len("  fi")
+        mutant = step[:start] + step[end:]
+        r = run_with_stubs(mutant, inspect_stub("true", "true 0"), HEALTH_MODE=RUNNING)
+        self.assertEqual(r.returncode, 0)
+
+    def test_other_modes_skip_it(self):
+        r = run_with_stubs(template_step(self.STEP), 'echo "docker called"; exit 1', HEALTH_MODE=VALIDATED)
+        self.assertEqual((r.returncode, r.stdout), (0, ""))
+
+
+class PortProbeControl(unittest.TestCase):
+    """nc -z proves nothing where a proxy answers for published ports, so every port-health job
+    first shows the probe reads a port nothing listens on as closed."""
+
+    STEP = "docker run -d --name health-probe-control"
+
+    def test_a_probe_that_reads_the_dead_port_as_closed_proceeds(self):
+        r = run_with_stubs(template_step(self.STEP), "exit 0", nc="exit 1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_a_probe_that_reaches_the_dead_port_fails_the_job(self):
+        r = run_with_stubs(template_step(self.STEP), "exit 0", nc="exit 0")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("cannot prove listening here", r.stdout)
+
+    def test_the_control_runs_on_the_service_port_before_the_service(self):
+        steps = ci_graph.resolve(ci_graph.load_config(ROOT), HEALTH_TEMPLATE)["script"]
+        control = [i for i, s in enumerate(steps) if self.STEP in s]
+        service = [i for i, s in enumerate(steps) if s.startswith('docker run -d --name "${SERVICE_NAME}-health"')]
+        self.assertEqual(len(control), 1)
+        self.assertLess(control[0], service[0])
+        self.assertIn('-p "${HEALTH_PORT}:${HEALTH_PORT}"', steps[control[0]])
+
+    def test_the_control_image_is_pinned(self):
+        variables = ci_graph.resolve(ci_graph.load_config(ROOT), HEALTH_TEMPLATE)["variables"]
+        self.assertRegex(variables["HEALTH_CONTROL_IMAGE"], r"@sha256:[0-9a-f]{64}$")
 
 
 class DependencyFixture(unittest.TestCase):

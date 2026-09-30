@@ -144,9 +144,13 @@ All ten wired components prove container health in CI. Two reach their listening
 only after a startup dependency answers, so their health job starts that dependency beside
 them as a digest-pinned fixture on a job-private network. That proves the image starts
 against the dependency it needs; it is not runtime readiness, and the readiness obligation
-stays open until a runtime window answers it. The fixtures take no credential and no data,
-and they are not the runtime dependency: cart's cache form and product-catalog's managed
-database are separate decisions.
+stays open until a runtime window answers it. Every port probe first starts a container that
+listens on nothing on the same port and must read it as closed, so where a proxy answers for
+published ports the job fails instead of passing a service it cannot prove. A worker that never
+listens is checked in a running mode that proves only that the process stays up for a bounded
+time beside a control that exits at once; no component uses that mode yet. The fixtures take
+no credential and no data, and they are not the runtime dependency: cart's cache form and
+product-catalog's managed database are separate decisions.
 
 | Component | Container health |
 |---|---|
