@@ -1,0 +1,54 @@
+# Declarative configuration for accounting; behaviour lives in ci/templates. No publish or
+# evidence job: accounting has no ECR repository and none is authorized.
+
+.accounting-vars: &accounting-vars
+  SERVICE_NAME: accounting
+  SERVICE_PATH: services/accounting
+  LANG_TIER: dotnet
+  # accounting COPYs pb/demo.proto into its build and compiles its message types from it, so
+  # a change to the shared contract changes what accounting builds.
+  SERVICE_SHARED_INPUTS: pb/**/*
+
+accounting:lint-dockerfile:
+  extends: .hadolint-template
+  variables:
+    <<: *accounting-vars
+
+# Service-local by necessity: Accounting.csproj compiles src/protos/demo.proto, which exists
+# only where Dockerfile line 12 copies it from pb/. This repeats that copy and nothing else.
+accounting:lint-dotnet:
+  extends: .lang-dotnet-template
+  before_script:
+    - mkdir -p "${SERVICE_PATH}/src/protos"
+    - cp pb/demo.proto "${SERVICE_PATH}/src/protos/demo.proto"
+  variables:
+    <<: *accounting-vars
+
+accounting:build:
+  extends: .image-build-template
+  variables:
+    <<: *accounting-vars
+
+# Scope artifact download to this service's build job. Multi-service pipelines otherwise
+# download multiple build artifacts that all use the shared image.tar filename.
+accounting:scan-image:
+  extends: .trivy-scan-template
+  dependencies:
+    - accounting:build
+  variables:
+    <<: *accounting-vars
+
+accounting:scan-source:
+  extends: .trivy-source-scan-template
+  variables:
+    <<: *accounting-vars
+
+accounting:health-test:
+  extends: .image-health-template
+  dependencies: []
+  variables:
+    <<: *accounting-vars
+    HEALTH_MODE: deferred-to-runtime
+    HEALTH_REASON: >-
+      no port to probe: Program.cs:14 builds a host with no server and Program.cs:22 blocks
+      in the Kafka consume loop at Consumer.cs:66; measured Running at 60s, zero listening sockets

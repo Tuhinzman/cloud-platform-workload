@@ -55,6 +55,7 @@ include:
   - local: services/flagd-ui/ci.yml
   - local: services/ad/ci.yml
   - local: services/fraud-detection/ci.yml
+  - local: services/accounting/ci.yml
 
 # GitLab's analyzer, a control separate from the image scanner; moved to lint (no test stage).
 secret_detection:
