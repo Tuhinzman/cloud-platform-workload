@@ -16,9 +16,12 @@ flagd-ui:lint-elixir:
   variables:
     <<: *flagd-ui-vars
 
-# No test job although upstream ships tests: config/test.exs:30 points the store at
-# test/fixtures/demo.flagd.json, which the repository does not contain, so mix test fails
-# at application start before any test runs.
+# config/test.exs:30 reads test/fixtures/demo.flagd.json, upstream's src/flagd/demo.flagd.json
+# committed past the service's ignore rule. The tests rewrite it, so run them from a clean checkout.
+flagd-ui:test-elixir:
+  extends: .lang-elixir-test-template
+  variables:
+    <<: *flagd-ui-vars
 
 flagd-ui:build:
   extends: .image-build-template

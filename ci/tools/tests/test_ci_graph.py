@@ -156,7 +156,7 @@ class FanOut(unittest.TestCase):
                 self.assertEqual(got, expected | {CONTROL_JOB})
 
     def test_language_tier_change_reaches_its_consumers_only(self):
-        for tier in ("go", "node", "php", "rust", "dotnet"):
+        for tier in ("go", "node", "php", "rust", "dotnet", "elixir"):
             with self.subTest(tier=tier):
                 expected = set()
                 for suffix in ("-template", "-test-template", "-parse-template"):
