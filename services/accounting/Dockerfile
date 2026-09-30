@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
-# Change: COPY source paths retargeted from src/ to services/ for this repository layout.
+# Change: COPY source paths retargeted from src/ to services/ for this repository layout. Runtime OpenSSL packages upgraded to pick up security fixes.
 
 FROM --platform=${BUILDPLATFORM} mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 ARG TARGETARCH
@@ -25,6 +25,10 @@ RUN dotnet publish "./Accounting.csproj" -r linux-$TARGETARCH -c $BUILD_CONFIGUR
 # -----------------------------------------------------------------------------
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends --only-upgrade libssl3t64 openssl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 USER app
 WORKDIR /app
 COPY --from=publish /app/publish .
