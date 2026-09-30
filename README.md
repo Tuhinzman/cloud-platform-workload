@@ -60,7 +60,7 @@ Upstream wrote this application and none of it is claimed as this project's work
 [DERIVATION.md](DERIVATION.md) is the per-file record of what differs and how to reproduce
 the tree.
 
-The pipeline now has shared templates for Go, Node, PHP, Rust, .NET and C++, but validation
+The pipeline now has shared templates for Go, Node, PHP, Rust, .NET, C++ and Python, but validation
 coverage is not uniform across the fleet. Checkout has an executed and passing
 Dockerfile lint path. Shipping and quote have executed validated build, scan, SBOM, and
 container health paths. Frontend, payment, and product-catalog are wired through build,
@@ -78,6 +78,10 @@ listen as a digest-pinned fixture beside it, Valkey for cart and PostgreSQL for
 product-catalog, so the probe is a real startup result; runtime readiness remains owed.
 currency is wired for Dockerfile lint, C++ static analysis, build, image and source scans
 and a container health job, with no publication stage; upstream ships no tests for it.
+product-reviews and recommendation are wired for Dockerfile lint, a Python compile check, a
+check that each committed `requirements.lock` still reproduces the dependency install, build,
+image and source scans and a container health job, with no publication stage; upstream ships
+no tests for either.
 The product-catalog Go lint job is now configured as blocking and its latest
 validated run reports no findings. payment declares no linter and no TypeScript, so it
 extends a Node parse check rather than a lint, which asserts only that every `.js` file
@@ -94,9 +98,9 @@ pipeline retain the provenance itself, shipping first and then image-provider: e
 keeps the registry manifest bytes whose sha256 is the published digest. frontend-proxy is
 wired for those stages and has published nothing, and cart is wired through scan with no
 publication stage, because no registry repository is declared for it. Those stages are not
-evidenced fleet-wide and seven components have no pipeline configuration at all. ADR-0017
+evidenced fleet-wide and five components have no pipeline configuration at all. ADR-0017
 now selects the full justified project-built inventory as the target of an owner-selected
-end-to-end programme, so those seven are selected work rather than work ruled out;
+end-to-end programme, so those five are selected work rather than work ruled out;
 selecting them is not delivering them, and promotion remains a separate implementation and
 validation obligation.
 

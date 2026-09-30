@@ -177,9 +177,9 @@ table is the record of their modification.
 | image-provider | Packages upgraded in a temporary privileged stage, served content given explicit ownership and read permissions, returns to the unprivileged nginx user |
 | frontend | Runtime base moved from `nodejs22-debian12` to `nodejs22-debian13` and pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
 | payment | Application files and dependencies owned by the unprivileged runtime user; runtime base moved from `nodejs22-debian12` to `nodejs22-debian13` and pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
-| product-reviews | Base packages upgraded |
+| product-reviews | Base packages upgraded, dependency install constrained to the committed `requirements.lock` |
 | quote | Runtime base moved from `php:8.4-cli-alpine3.22`, which is no longer rebuilt, to `php:8.4-cli-alpine3.23` pinned by digest, whose own packages carry the fixes the image scan requires; extension installer raised to 2.9.22, pinned by digest, for Alpine 3.23 support |
-| recommendation | TLS libraries upgraded, application directories given explicit read permissions |
+| recommendation | TLS libraries and libuuid upgraded, application directories given explicit read permissions, dependency install constrained to the committed `requirements.lock` |
 | shipping | Runtime base pinned by digest; libssl3t64 3.5.7-1~deb13u3 installed over the base from Debian's security archive, with its package record, until a distroless build carries it |
 | frontend-proxy | Base image pinned to an immutable digest, package installation narrowed, TLS libraries added, configuration template given explicit ownership and read-only permissions |
 
@@ -226,15 +226,15 @@ base images.
 | Node | frontend, payment | `package.json` | `ci/templates/lang-node.yml` |
 | .NET | accounting, cart | `Accounting.csproj`, `cart.sln` | `ci/templates/lang-dotnet.yml`, net-new |
 | Java | ad, fraud-detection | `build.gradle`, `build.gradle.kts` | Net-new |
-| Python | product-reviews, recommendation | `requirements.txt` | Net-new |
+| Python | product-reviews, recommendation | `requirements.txt` | `ci/templates/lang-python.yml`, net-new |
 | Rust | shipping | `Cargo.toml` | `ci/templates/lang-rust.yml` |
 | Ruby | email | `Gemfile` | Net-new |
 | PHP | quote | `composer.json` | `ci/templates/lang-php.yml` |
 | C++ | currency | `CMakeLists.txt` | `ci/templates/lang-cpp.yml`, net-new |
 | Elixir | flagd-ui | `mix.exs` | Net-new |
 
-Six tiers of ten have a template today. The other four have none. ADR-0017 selects the
-full justified project-built inventory as the programme target, so those four tiers are
+Seven tiers of ten have a template today. The other three have none. ADR-0017 selects the
+full justified project-built inventory as the programme target, so those three tiers are
 selected work; no schedule for them is claimed here.
 
 `frontend-proxy` and `image-provider` have no application language. They package an
@@ -275,9 +275,9 @@ language toolchain, driven by the manifest upstream ships.
 | frontend | `package.json` | npm |
 | payment | `package.json` | npm |
 | product-catalog | `go.mod` | Go |
-| product-reviews | `requirements.txt` | pip |
+| product-reviews | `requirements.txt`, installed under the project-generated `requirements.lock` | pip |
 | quote | `composer.json` | Composer |
-| recommendation | `requirements.txt` | pip |
+| recommendation | `requirements.txt`, installed under the project-generated `requirements.lock` | pip |
 | shipping | `Cargo.toml` | Cargo |
 | frontend-proxy | None | Configuration only, built by its container definition |
 | image-provider | None | Configuration and static assets, built by its container definition |
@@ -321,7 +321,7 @@ has no repository in the platform registry, as `currency` does not, its publish 
 jobs stay unwired rather than pointing somewhere wrong. It is still wired through build and
 scan, because neither stage touches the registry.
 
-Seven components have no per-service configuration. Six of them have a language tier with
+Five components have no per-service configuration. Four of them have a language tier with
 no template; accounting is the exception, because the .NET tier now has one and accounting
 is not yet wired to it. `frontend-proxy` and `image-provider` have no application
 language, and each carries a per-service `ci.yml` regardless, because a container
@@ -330,15 +330,18 @@ definition is enough to build, lint and scan.
 `services/cart/ci.yml` is net-new rather than carried, and is the only per-service file
 that declares `SERVICE_DOCKERFILE`, because cart is the only component whose container
 definition is not at its service root. `services/currency/ci.yml` and the C++ tier template
-it extends, `ci/templates/lang-cpp.yml`, are net-new as well.
+it extends, `ci/templates/lang-cpp.yml`, are net-new as well, as are
+`services/product-reviews/ci.yml`, `services/recommendation/ci.yml` and the Python tier
+template they extend, `ci/templates/lang-python.yml`.
 
 ### Not implemented
 
 ADR-0017 selects the full justified project-built inventory as the target of an
-owner-selected end-to-end programme. Selection is not delivery, and .NET and C++ are the only
-tiers of that breadth implemented so far, so the following are recorded as not implemented:
+owner-selected end-to-end programme. Selection is not delivery, and .NET, C++ and Python are the
+only tiers of that breadth implemented so far, so the following are recorded as not
+implemented:
 
-- Language-tier templates for Java, Python, Ruby, and Elixir.
+- Language-tier templates for Java, Ruby, and Elixir.
 - Image size budgets.
 
 Net-new and now implemented, executed for checkout, shipping and quote, and since then for image-provider:
@@ -399,14 +402,16 @@ upstream-derived files differ in content: the twenty-two container definitions r
 modified above, plus the eighteen the preceding section records. Those eighteen are what
 separates this result from the twenty-two figure, which counts modified container
 definitions only. The remaining three hundred and twelve upstream-derived files in the
-scope are byte-identical, and no upstream file in the scope is missing here. Thirteen files
+scope are byte-identical, and no upstream file in the scope is missing here. Seventeen files
 are present here and absent upstream: the per-service `ci.yml` under `checkout`,
 `product-catalog`, `frontend`, `payment`, `shipping`, `quote`, `frontend-proxy`,
-`image-provider`, `cart`, and `currency`; `services/frontend/eslint.config.mjs`; and two lock
-files, `services/cart/src/packages.lock.json` and `services/quote/composer.lock`, which exist so
-the source gate has a declared dependency set to read. Those thirteen are project-added with no
-upstream origin, so no modification notice applies to them. The flat ESLint configuration is project-added rather than a modification
-because ESLint 9 reads flat configuration only and upstream ships none; the upstream
+`image-provider`, `cart`, `currency`, `product-reviews`, and `recommendation`;
+`services/frontend/eslint.config.mjs`; and four lock files, `services/cart/src/packages.lock.json`,
+`services/quote/composer.lock` and the pip-generated `requirements.lock` under
+`services/product-reviews` and `services/recommendation`, which exist so the source gate has a
+declared dependency set to read. Those seventeen are project-added with no upstream origin, so
+no modification notice applies to them. The flat ESLint configuration is project-added rather
+than a modification because ESLint 9 reads flat configuration only and upstream ships none; the upstream
 `.eslintrc` beside it is retained unmodified and still counts among the byte-identical
 files.
 
