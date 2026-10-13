@@ -1,5 +1,8 @@
 # Cloud Platform Workload
 
+> Authoritative repository: [GitLab, tuinzaman/cloud-platform-workload](https://gitlab.com/tuinzaman/cloud-platform-workload).
+> The copy on GitHub is a read-only mirror. Merge requests and CI run on GitLab only.
+
 The application this platform runs, and nothing else. Architecture, infrastructure, and
 the reasoning behind them live in the
 [platform reference repository](https://github.com/Tuhinzman/cloud-platform-reference). This repository holds
