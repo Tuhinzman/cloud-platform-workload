@@ -6,6 +6,11 @@ table drift apart.
 
 **Evidence status is partial, and the kinds of evidence differ.** Checkout, shipping and
 quote each have build, scan, SBOM, artifact-publication and bounded runtime evidence.
+The checkout and product-catalog container definitions were rewritten on 2026-10-13, and
+both modules moved to `go 1.26.0` with `golang.org/x/net` `v0.60.0` in the same change;
+every pipeline, publication and runtime result recorded here for those two belongs to
+images built before it, and the new state carries local validation only until a pipeline
+has run it.
 image-provider has build, scan, SBOM and artifact-publication evidence; it has no runtime
 evidence, because no runtime window has included it. Two publications carry a provenance
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
@@ -45,14 +50,14 @@ hardening, the pipeline, and the evidence.
 | accounting | .NET | `src/accounting` | Path plus hardening | None |
 | ad | Java | `src/ad` | Path plus hardening | None |
 | cart | .NET | `src/cart` | Path plus hardening | Unit, `tests/CartServiceTests.cs`, all skipped upstream |
-| checkout | Go | `src/checkout` | Modified beyond path retarget | Unit, `money/money_test.go` |
+| checkout | Go | `src/checkout` | Project-maintained since 2026-10-13 | Unit, `money/money_test.go` |
 | currency | C++ | `src/currency` | Path plus hardening | None |
 | email | Ruby | `src/email` | Path plus hardening | None |
 | flagd-ui | Elixir | `src/flagd-ui` | Path plus hardening | Unit and controller, seven files |
 | fraud-detection | Java | `src/fraud-detection` | Path plus hardening | None |
 | frontend | Node | `src/frontend` | Path plus hardening | Cypress harness configuration |
 | payment | Node | `src/payment` | Path plus hardening | None |
-| product-catalog | Go | `src/product-catalog` | Path-only modified | None |
+| product-catalog | Go | `src/product-catalog` | Project-maintained since 2026-10-13 | None |
 | product-reviews | Python | `src/product-reviews` | Path plus hardening | None |
 | quote | PHP | `src/quote` | Path plus hardening | None |
 | recommendation | Python | `src/recommendation` | Path plus hardening | None |
