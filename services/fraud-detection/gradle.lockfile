@@ -1,7 +1,7 @@
 # This is a Gradle generated file for dependency locking.
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
-at.yawk.lz4:lz4-java:1.10.1=compileProtoPath,runtimeClasspath,testCompileProtoPath,testRuntimeClasspath
+at.yawk.lz4:lz4-java:1.11.4=compileProtoPath,runtimeClasspath,testCompileProtoPath,testRuntimeClasspath
 biz.aQute.bnd:biz.aQute.bnd.annotation:7.1.0=compileClasspath,testCompileClasspath
 com.ethlo.time:itu:1.14.0=compileClasspath,compileProtoPath,runtimeClasspath,testCompileClasspath,testCompileProtoPath,testRuntimeClasspath
 com.fasterxml.jackson.core:jackson-annotations:2.21=compileClasspath,compileProtoPath,runtimeClasspath,testCompileClasspath,testCompileProtoPath,testRuntimeClasspath

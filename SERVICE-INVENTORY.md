@@ -41,9 +41,15 @@ SBOM and container health with no publication stage. The product-reviews and rec
 container definitions moved on 2026-10-15 to the `python:3.12.15-alpine3.24` base without the
 runtime package upgrade, and both now run as a non-root user; the pipeline results recorded
 for them belong to the earlier definitions, and the new ones carry local validation only until
-a pipeline has run them. fraud-detection and accounting carry
+a pipeline has run them. The ad definition moved the same day to
+`eclipse-temurin:21.0.12.1_1-jre-noble`, the Ubuntu 24.04 build of the same JRE, without the
+OpenSSL pin that no longer installed, and now runs as a non-root user; it carries local
+validation only until a pipeline has run it. fraud-detection and accounting carry
 build, both security gates and SBOM with no publication stage, and a running check in place
-of container health, because neither listens. flagd-ui carries build, both security gates,
+of container health, because neither listens. The fraud-detection definition moved the same day
+to digest-pinned bases and a root-owned application directory, and its lock takes lz4-java
+`1.11.4` in place of the `1.10.1` kafka-clients asks for; it too carries local validation only
+until a pipeline has run it. flagd-ui carries build, both security gates,
 SBOM and its eleven upstream tests, with container health deferred to runtime and no
 publication stage. Wiring is not execution, publication is not runtime evidence, and none of
 this is fleet-wide delivery. Identity and classification are facts about the source and are
@@ -209,7 +215,7 @@ varies by language rather than by packaging. Measured at the current anchor:
 | recommendation | Python | 40, from the installed venv and the base image's pip | 46: 38 from `requirements.lock`, 8 from `requirements.txt` |
 | email | Ruby | the bundle's gems and the gems shipped with Ruby, read from their gemspecs | 90, from `Gemfile.lock` |
 | flagd-ui | Elixir | none: Debian packages only; the Hex dependencies and the bundled OTP runtime are not visible | 54, from `mix.lock` |
-| ad | Java | 70 Maven, from the installed jars and the OpenTelemetry agent, and 13 Go modules from the base image's `pebble` binary | 78, from `gradle.lockfile` |
+| ad | Java | 70 Maven, from the installed jars and the OpenTelemetry agent | 78, from `gradle.lockfile` |
 | fraud-detection | Java | 46 Maven: the 45 whose metadata is inside the shadow jar, and the OpenTelemetry agent | 102, from `gradle.lockfile` |
 | accounting | .NET | 48 NuGet, from the application's and the shared runtime's `.deps.json` | 67, from `packages.lock.json` |
 

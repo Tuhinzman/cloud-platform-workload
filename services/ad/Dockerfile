@@ -11,10 +11,17 @@
 # dependencies strictly and downloadRepos resolves them before the rest of the source arrives.
 # Change: build/outputLocation, the jar copy downloadRepos makes, is deleted before the runtime
 # stage copies the application directory; the start script loads only the installed lib/.
-# Change: the OpenSSL packages are pinned to the fixed revision 3.5.5-1ubuntu3.6, which the
-# newest eclipse-temurin:21-jre digest does not yet carry.
+# Change: builder and runtime bases pinned by digest. The runtime moved from eclipse-temurin:21-jre,
+# now built on Ubuntu 26.04, to the Ubuntu 24.04 (noble) build of the same JRE 21.0.12.1+1: the
+# 26.04 image carries fixable HIGH findings in curl and in its pebble binary, and noble none.
+# Change: the OpenSSL package pin removed; its revision no longer resolves, and the noble base
+# needs no package upgrade.
+# Change: the agent download is verified against the release's sha256.
+# Change: application files copied owned by root with fixed modes, read-only to the runtime user.
+# Change: the runtime user set numerically to the base's nobody account.
+# Change: EXPOSE names port 8080; ${AD_PORT} is undefined when the image builds.
 
-FROM --platform=${BUILDPLATFORM} eclipse-temurin:21-jdk AS builder
+FROM --platform=${BUILDPLATFORM} eclipse-temurin:21.0.12.1_1-jdk-resolute@sha256:b6a11792e73e0a2d0d96f1d5cb186da289a2741f8148ed174f6654a0335745cd AS builder
 ARG _JAVA_OPTIONS
 WORKDIR /usr/src/app/
 
@@ -33,23 +40,21 @@ RUN rm -rf build/outputLocation
 
 # -----------------------------------------------------------------------------
 
-FROM eclipse-temurin:21-jre
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libssl3t64=3.5.5-1ubuntu3.6 \
-        openssl=3.5.5-1ubuntu3.6 \
-        openssl-provider-legacy=3.5.5-1ubuntu3.6 \
-    && rm -rf /var/lib/apt/lists/*
+FROM eclipse-temurin:21.0.12.1_1-jre-noble@sha256:000fd431958bc81a24abe1e8e5f0f0fd3ae365a594bd50aadb20696805f9408c
 
 ARG OTEL_JAVA_AGENT_VERSION=2.26.1
 ARG _JAVA_OPTIONS
 
 WORKDIR /usr/src/app/
 
-COPY --from=builder /usr/src/app/ ./
-ADD --chmod=644 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v$OTEL_JAVA_AGENT_VERSION/opentelemetry-javaagent.jar /usr/src/app/opentelemetry-javaagent.jar
+COPY --from=builder --chmod=u=rwX,go=rX /usr/src/app/ ./
+ADD --checksum=sha256:cc4af5966ab72109cacc962ba3b9f99b3e88caf064c3144a451bcfe0f4950f19 --chmod=644 https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v$OTEL_JAVA_AGENT_VERSION/opentelemetry-javaagent.jar /usr/src/app/opentelemetry-javaagent.jar
 ENV JAVA_TOOL_OPTIONS=-javaagent:/usr/src/app/opentelemetry-javaagent.jar
 
-EXPOSE ${AD_PORT}
+USER 65534:65534
+
+EXPOSE 8080
 ENTRYPOINT [ "./build/install/opentelemetry-demo-ad/bin/Ad" ]
+
+# The checksum is the 2.26.1 agent's; another OTEL_JAVA_AGENT_VERSION fails the build until the checksum changes with it.
+# The base defines no service account, so the runtime uses its nobody account; chart 0.40.10 sets no security context.

@@ -4,6 +4,8 @@
 // Change: kafka-clients raised from 4.1.1 to 4.1.2, and jackson (2.21.7) and netty
 // (4.2.18.Final) aligned through their BOMs, to clear the HIGH and CRITICAL findings both
 // scans reported.
+// Change: lz4-java, which kafka-clients 4.1.2 asks for at 1.10.1, constrained to 1.11.4 to
+// clear CVE-2026-106451, a HIGH finding both scans reported.
 
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import com.google.protobuf.gradle.*
@@ -45,6 +47,9 @@ dependencies {
     testImplementation(kotlin("test"))
     implementation(kotlin("script-runtime"))
     implementation("org.apache.kafka:kafka-clients:4.1.2")
+    constraints {
+        implementation("at.yawk.lz4:lz4-java:1.11.4")
+    }
     implementation("com.google.api.grpc:proto-google-common-protos:2.63.2")
     implementation("io.grpc:grpc-protobuf:${grpcVersion}")
     implementation("io.grpc:grpc-stub:${grpcVersion}")
