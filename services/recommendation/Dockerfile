@@ -2,15 +2,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
-# Change: COPY source paths retargeted from src/ to services/ for this repository layout. TLS libraries upgraded and application directories given explicit read permissions.
-# Change: libuuid upgraded beside the TLS libraries. The base ships 2.41-r9, against which the
-# image scan reports six fixable HIGH util-linux findings; nothing else in the base is upgraded.
+# Change: COPY source paths retargeted from src/ to services/ for this repository layout.
+# Change: builder and runtime moved from python:3.12-alpine3.22, last published at 3.12.13, to 3.12.15-alpine3.24, pinned by digest.
+# Change: the runtime upgrade of libcrypto3, libssl3 and libuuid removed; the pinned base carries the fixed packages.
 # Change: requirements.lock copied into the venv stage and set as pip's constraint, so the
 # requirements install and opentelemetry-bootstrap both take the versions the source gate scans.
 # Upstream pins direct dependencies only; every other package resolves at build time to the
 # newest release its declared range allows.
+# Change: application and venv files copied owned by root with fixed modes, read-only to the runtime user.
+# Change: the runtime user set numerically to the base's nobody account.
+# Change: EXPOSE names port 8080; ${RECOMMENDATION_PORT} is undefined when the image builds.
 
-FROM docker.io/library/python:3.12-alpine3.22 AS build-venv
+FROM docker.io/library/python:3.12.15-alpine3.24@sha256:1b668429b3511ab407d8e00648891631b0b1a4d7e15e3ca70f38ab5b91ad4ab4 AS build-venv
 
 RUN apk update && \
     apk add gcc g++ linux-headers
@@ -25,21 +28,22 @@ RUN python -m venv venv && \
 
 RUN venv/bin/opentelemetry-bootstrap -a install
 
-FROM docker.io/library/python:3.12-alpine3.22
+FROM docker.io/library/python:3.12.15-alpine3.24@sha256:1b668429b3511ab407d8e00648891631b0b1a4d7e15e3ca70f38ab5b91ad4ab4
 
-RUN apk upgrade --no-cache libcrypto3 libssl3 libuuid
-
-COPY --from=build-venv /venv/ /venv/
+COPY --from=build-venv --chmod=u=rwX,go=rX /venv/ /venv/
 
 WORKDIR /app
 
-COPY ./services/recommendation/demo_pb2_grpc.py demo_pb2_grpc.py
-COPY ./services/recommendation/demo_pb2.py demo_pb2.py
-COPY ./services/recommendation/logger.py logger.py
-COPY ./services/recommendation/metrics.py metrics.py
-COPY ./services/recommendation/recommendation_server.py recommendation_server.py
+COPY --chmod=u=rwX,go=rX ./services/recommendation/demo_pb2_grpc.py demo_pb2_grpc.py
+COPY --chmod=u=rwX,go=rX ./services/recommendation/demo_pb2.py demo_pb2.py
+COPY --chmod=u=rwX,go=rX ./services/recommendation/logger.py logger.py
+COPY --chmod=u=rwX,go=rX ./services/recommendation/metrics.py metrics.py
+COPY --chmod=u=rwX,go=rX ./services/recommendation/recommendation_server.py recommendation_server.py
 
-EXPOSE ${RECOMMENDATION_PORT}
-RUN chmod -R a+rX /app /venv
+USER 65534:65534
 
+EXPOSE 8080
 ENTRYPOINT [ "/venv/bin/opentelemetry-instrument", "/venv/bin/python", "recommendation_server.py" ]
+
+# The builder's apk add still reads the moving Alpine index; only the venv it builds reaches the runtime stage.
+# The base has no service account, so the runtime uses its nobody account; chart 0.40.10 sets no security context.

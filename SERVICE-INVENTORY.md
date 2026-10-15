@@ -23,7 +23,10 @@ the pipeline results recorded for it belong to the earlier definition, and the n
 local validation only until a pipeline has run it. cart has
 executed build, scan and SBOM on a pipeline that passed, validates container health against
 an ephemeral Valkey fixture, and has published nothing: no digest, no promotion, no
-runtime. payment and frontend each carry build, both security gates, SBOM, container
+runtime. Its container definition moved on 2026-10-15 to the .NET
+`runtime-deps:10.0.13-alpine3.24` base without the build-time package upgrade; the pipeline
+results recorded for it belong to the earlier definition, and the new one carries local
+validation only until a pipeline has run it. payment and frontend each carry build, both security gates, SBOM, container
 health and the manual publish and evidence jobs on main; product-catalog carries all of
 those but the publication jobs, and validates container health against an ephemeral
 PostgreSQL fixture. None of the four has
@@ -34,7 +37,11 @@ than an exception: it binds its gRPC port before anything external is needed. Wh
 does not cover is recorded with it - the Charge handler reaches flagd per request, so the
 application path beyond the health service is not validated in CI.
 currency, product-reviews, recommendation, email and ad carry build, both security gates,
-SBOM and container health with no publication stage. fraud-detection and accounting carry
+SBOM and container health with no publication stage. The product-reviews and recommendation
+container definitions moved on 2026-10-15 to the `python:3.12.15-alpine3.24` base without the
+runtime package upgrade, and both now run as a non-root user; the pipeline results recorded
+for them belong to the earlier definitions, and the new ones carry local validation only until
+a pipeline has run them. fraud-detection and accounting carry
 build, both security gates and SBOM with no publication stage, and a running check in place
 of container health, because neither listens. flagd-ui carries build, both security gates,
 SBOM and its eleven upstream tests, with container health deferred to runtime and no
