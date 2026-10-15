@@ -17,7 +17,10 @@ evidence, because no runtime window has included it. Its container definition mo
 evidence belongs to images built before the change, and the new definition carries local
 validation only until a pipeline has run it. Two publications carry a provenance
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
-is wired for build, scan, SBOM and container health and has published nothing. cart has
+is wired for build, scan, SBOM and container health and has published nothing. Its container
+definition moved on 2026-10-15 to the Envoy `v1.37.9` base with only `gettext-base` installed;
+the pipeline results recorded for it belong to the earlier definition, and the new one carries
+local validation only until a pipeline has run it. cart has
 executed build, scan and SBOM on a pipeline that passed, validates container health against
 an ephemeral Valkey fixture, and has published nothing: no digest, no promotion, no
 runtime. payment and frontend each carry build, both security gates, SBOM, container
