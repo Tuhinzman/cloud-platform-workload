@@ -12,7 +12,10 @@ every pipeline, publication and runtime result recorded here for those two belon
 images built before it, and the new state carries local validation only until a pipeline
 has run it.
 image-provider has build, scan, SBOM and artifact-publication evidence; it has no runtime
-evidence, because no runtime window has included it. Two publications carry a provenance
+evidence, because no runtime window has included it. Its container definition moved on
+2026-10-15 to the `1.30.6-alpine3.24-otel` base without the build-time package upgrade; that
+evidence belongs to images built before the change, and the new definition carries local
+validation only until a pipeline has run it. Two publications carry a provenance
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
 is wired for build, scan, SBOM and container health and has published nothing. cart has
 executed build, scan and SBOM on a pipeline that passed, validates container health against
