@@ -49,7 +49,10 @@ build, both security gates and SBOM with no publication stage, and a running che
 of container health, because neither listens. The fraud-detection definition moved the same day
 to digest-pinned bases and a root-owned application directory, and its lock takes lz4-java
 `1.11.4` in place of the `1.10.1` kafka-clients asks for; it too carries local validation only
-until a pipeline has run it. flagd-ui carries build, both security gates,
+until a pipeline has run it. The accounting and email definitions moved on 2026-10-16 to
+digest-pinned bases with root-owned application files and numeric non-root users, so email no
+longer runs as root; both carry local validation only until a pipeline has run them.
+flagd-ui carries build, both security gates,
 SBOM and its eleven upstream tests, with container health deferred to runtime and no
 publication stage. Wiring is not execution, publication is not runtime evidence, and none of
 this is fleet-wide delivery. Identity and classification are facts about the source and are

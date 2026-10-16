@@ -2,9 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
-# Change: COPY source paths retargeted from src/ to services/ for this repository layout. Runtime OpenSSL packages upgraded to pick up security fixes.
+# Change: COPY source paths retargeted from src/ to services/ for this repository layout.
+# Change: SDK builder and ASP.NET runtime pinned by digest, the images the floating 10.0 tags resolved to.
+# Change: the runtime OpenSSL upgrade removed; the pinned base already carries the revision it installed.
+# Change: /app is created by root and its files are copied owned by root with fixed modes, read-only to
+# the runtime user; instrument.sh is no longer handed to that user. The auto-instrumentation log
+# directory stays writable by it.
+# Change: the runtime user set numerically to the base's app account.
 
-FROM --platform=${BUILDPLATFORM} mcr.microsoft.com/dotnet/sdk:10.0 AS builder
+FROM --platform=${BUILDPLATFORM} mcr.microsoft.com/dotnet/sdk:10.0.402@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa AS builder
 ARG TARGETARCH
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
@@ -24,20 +30,15 @@ RUN dotnet publish "./Accounting.csproj" -r linux-$TARGETARCH -c $BUILD_CONFIGUR
 
 # -----------------------------------------------------------------------------
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends --only-upgrade libssl3t64 openssl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-USER app
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.13@sha256:d5633778c754e89a386882eddf8dbee6942447a8a4b8267c19cf1e1158d0b0ac
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=publish --chmod=u=rwX,go=rX /app/publish .
 
-USER root
-RUN mkdir -p "/var/log/opentelemetry/dotnet"
-RUN chown app "/var/log/opentelemetry/dotnet"
-RUN chown app "/app/instrument.sh"
-USER app
+RUN mkdir -p /var/log/opentelemetry/dotnet && chown 1654:1654 /var/log/opentelemetry/dotnet
+USER 1654:1654
 ENV OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES=Accounting.Consumer
 
 ENTRYPOINT ["./instrument.sh", "dotnet", "Accounting.dll"]
+
+# instrument.sh ships as 0744, so only its owner could run it; the copy's X makes it executable by all while
+# root keeps it. The base sets APP_UID 1654; chart 0.40.10 sets no security context for accounting.
