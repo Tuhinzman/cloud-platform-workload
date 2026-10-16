@@ -35,19 +35,74 @@ project owns, and how to reproduce the tree byte for byte.
 here, each with a justification and the condition that would remove it.
 
 [SERVICE-INVENTORY.md](SERVICE-INVENTORY.md) is where per-component evidence is
-reported. Its status columns remain empty until corresponding per-component evidence
-is recorded.
+reported.
+
+## Why We Hardened the Containers
+
+The container definitions came from the upstream demo, which was written to run the demo,
+not to supply a platform that admits images by digest and runs them as unprivileged users.
+Most bases were referenced by tag instead of digest, and many of those tags float, such as
+`golang:1.25-bookworm`, `node:22-slim` and `rust:1.91`, so one commit could build a
+different image later. Several images ran as root, and in others the runtime user owned the
+application directory and could replace or delete what it ran. Most wrote `EXPOSE` with a
+variable that is undefined at build time, which declares nothing, and the scans reported
+fixable HIGH and CRITICAL findings that the pipeline's gates block on.
+
+Between 2026-10-13 and 2026-10-16 all seventeen definitions went through a hardening pass.
+Each now pins its base images by digest, runs as a numeric non-root user over application
+files owned by root, and, where it listens, declares the port it uses. The fixable HIGH and
+CRITICAL findings were cleared by moving bases and dependencies, with no scanner exception
+or ignore rule. Some examples from the per-component record in
+[DERIVATION.md](DERIVATION.md#hardening-applied-by-component):
+
+- Built on an arm64 host for amd64, shipping's earlier definition put an aarch64 binary into
+  the amd64 image, which then failed to start. The amd64 target is now cross-compiled, and
+  the stage that installed libssl3t64 over the base is gone, because the newest base digest
+  ships the fixed package.
+- fraud-detection's runtime user owned its application directory and could rename or delete
+  the jars it ran. Root now creates that directory, and lz4-java moved to `1.11.4` for
+  CVE-2026-106451, a HIGH both scans reported.
+- frontend-proxy now `exec`s Envoy, so a stop signal reaches it: `docker stop` returned in
+  0 s with exit code 0, where the shell had left it 10 s and exit code 137.
+- flagd-ui ran as root and now runs as `nobody`. Its lock moved bandit to 1.13.1 for
+  EEF-CVE-2026-105659, a HIGH advisory that OSV and the Hex advisory feed listed while the
+  scanner's database did not.
+
+In practice, the base under each build changes only when someone changes its pin, the
+processes cannot modify the code they run, and the user and port are explicit for the
+platform's security context. Several images still read a moving package index at build
+time, which DERIVATION.md records per component.
+
+The application inside these images remains upstream's work. The hardening changed how it
+is built, packaged and run; the few source and dependency changes are listed in
+DERIVATION.md.
 
 ## Current Status
 
-Implementation evidence is partial. Checkout, shipping and quote have each been built,
-scanned, published with an SBOM, and exercised inside bounded EKS runtime windows:
-shipping carries a four-of-four telemetry signal digest match, and quote's induced fault
-and recovery were observed end to end. Every runtime was torn down, and no runtime is
-currently live.
+The Dockerfile and merge-request CI milestone is complete for all seventeen components:
+each hardened definition was merged through a GitLab merge request, !44 to !54, after its
+merge-request pipeline passed. Only the pipelines' overall status is recorded; their job
+logs and artifacts have not been inspected for this record. The milestone is not delivery. No hardened image is recorded as published to ECR,
+and none is pinned in the deployment repository, admitted under ADR-0015 or run on AWS.
+
+The earlier evidence belongs to images built before the hardening. Checkout, shipping and
+quote were each built, scanned, published with an SBOM, read back from the registry by
+digest, and exercised inside bounded EKS runtime windows: shipping carries a four-of-four
+telemetry signal digest match, and quote's induced fault and recovery were observed end to
+end. image-provider was published the same way and has not run in a window. The shipping
+and image-provider publications also had the pipeline retain the provenance itself, keeping
+the registry manifest bytes whose sha256 is the published digest. Every runtime was torn
+down, and no runtime is currently live.
+
+[SERVICE-INVENTORY.md](SERVICE-INVENTORY.md) records each component's pipeline coverage,
+the tests it actually has and what each result does not show. ADR-0017 selects the full
+justified project-built inventory as the target of an owner-selected end-to-end programme;
+selecting it is not delivering it, and promotion remains a separate implementation and
+validation obligation.
 
 Twenty-two container definitions are modified, each carrying an Apache-2.0 modification
-notice. They are adapted deliberately, for this repository's build layout and for the
+notice: the seventeen component definitions above and five auxiliary ones changed only in
+their paths. They are adapted deliberately, for this repository's build layout and for the
 platform work this workload exists to exercise.
 
 Beyond those, `checkout` and `product-catalog` carry project modifications to their application
@@ -58,68 +113,8 @@ and `frontend` to five application-source files and its npm dependency metadata.
 upstream-derived file in the compared scope, including all remaining application source and the
 protobuf contract, is byte-identical to the pinned upstream release. That scope is `services/`,
 `pb/` and `LICENSE`, and the comparison makes no claim about files outside it.
-
-Upstream wrote this application and none of it is claimed as this project's work.
 [DERIVATION.md](DERIVATION.md) is the per-file record of what differs and how to reproduce
 the tree.
-
-The pipeline now has shared templates for all ten tiers, Go, Node, PHP, Rust, .NET, C++,
-Python, Ruby, Elixir and Java, but validation coverage is not uniform across the fleet.
-Checkout has an executed and passing Dockerfile lint path. Shipping and quote have executed validated build, scan, SBOM, and
-container health paths. Frontend, payment, and product-catalog are wired through build,
-image and source scans and a container health job, and each has passed its merge-request
-pipeline; frontend and payment pass the health check. Frontend and payment also carry the
-manual publish and evidence jobs on main and have published nothing; product-catalog has no
-publication stage.
-frontend-proxy and image-provider are wired through the
-same shared templates for build, scan, SBOM and container health; neither carries a
-language tier, because neither directory holds application source. cart is wired through
-the shared templates for Dockerfile lint, .NET lint, tests, build, scan and SBOM. Its
-three upstream tests all carry a skip, so that job asserts nothing today. Its container
-health job, like product-catalog's, starts the dependency the process needs before it can
-listen as a digest-pinned fixture beside it, Valkey for cart and PostgreSQL for
-product-catalog, so the probe is a real startup result; runtime readiness remains owed.
-currency is wired for Dockerfile lint, C++ static analysis, build, image and source scans
-and a container health job, with no publication stage; upstream ships no tests for it.
-product-reviews and recommendation are wired for Dockerfile lint, a Python compile check, a
-check that each committed `requirements.lock` still reproduces the dependency install, build,
-image and source scans and a container health job, with no publication stage; upstream ships
-no tests for either. email is wired for Dockerfile lint, a Ruby parse check with a frozen lock
-install, build, image and source scans and a container health job, with no publication
-stage; upstream ships no tests for it. flagd-ui is wired for Dockerfile lint, an Elixir lock,
-compile and format check, its eleven upstream tests, build, and image and source scans, with
-no publication stage; its tests read upstream's own flag file, carried as test data, and its
-container health is deferred to runtime because the release will not start without the flag
-file its pod mounts. ad and fraud-detection are wired for Dockerfile lint, a Gradle build
-under strict dependency locking, build, and image and source scans, with no publication
-stage; upstream ships no tests for either. ad's container health is validated in CI.
-fraud-detection is a Kafka consumer that never listens, so its job proves only that the
-process stays running for a bounded time beside a control that aborts itself at once, which
-is not functional health. accounting is wired through the shared templates for Dockerfile
-lint, .NET lint, build, and image and source scans, with no publication stage; upstream ships
-no tests for it. Its .NET lint job first copies the shared contract to the path its project
-file compiles, the pipeline's one service-local step. accounting is a Kafka consumer too, and
-its running check is the same bounded, non-functional result.
-The product-catalog Go lint job is now configured as blocking and its latest
-validated run reports no findings. payment declares no linter and no TypeScript, so it
-extends a Node parse check rather than a lint, which asserts only that every `.js` file
-in the service directory parses; that job is now configured as blocking and its first
-validated run passed. The frontend Node lint job is blocking: the service now carries a
-project-added flat ESLint configuration, and the latest validated run on main reports
-zero errors and twelve reported-but-unremediated warnings, with the TypeScript check
-reached and passing.
-
-Checkout, shipping and quote have each completed build, scan, SBOM and artifact-publication
-stages, and each published digest was read back independently from the registry.
-image-provider has since completed the same stages. Two of those publications also had the
-pipeline retain the provenance itself, shipping first and then image-provider: each bundle
-keeps the registry manifest bytes whose sha256 is the published digest. frontend-proxy is
-wired for those stages and has published nothing, and cart is wired through scan with no
-publication stage, because no registry repository is declared for it. Every project-built
-component now has pipeline configuration, but those stages are not evidenced fleet-wide.
-ADR-0017 selects the full justified project-built inventory as the target of an
-owner-selected end-to-end programme; selecting it is not delivering it, and promotion remains
-a separate implementation and validation obligation.
 
 ## Licence and Attribution
 
@@ -130,3 +125,21 @@ release. The upstream release contains no NOTICE file, so none is included here.
 Upstream wrote the application, its service architecture, its protobuf contracts, and its
 OpenTelemetry instrumentation. What this project adds is stated in
 [DERIVATION.md](DERIVATION.md) rather than implied here.
+
+## Ownership, Reuse and Feedback
+
+This repository records the platform engineering this project did on the workload: the
+container definitions as modified here, the delivery pipeline and its scanning, and the
+derivation and evidence records. The application stays upstream's, as the
+[ownership boundary](DERIVATION.md#ownership-boundary) sets out. The record is meant to be
+checked rather than taken on trust: the Git history, the merge requests and their pipelines
+on GitLab, [DERIVATION.md](DERIVATION.md) and [SERVICE-INVENTORY.md](SERVICE-INVENTORY.md)
+show what changed, when, and with what result.
+
+The licence above lets you use, study and adapt this work; keep its notices and the
+upstream attribution, and mark the files you change. Feedback and suggested improvements are
+welcome as issues or merge requests on the
+[GitLab repository](https://gitlab.com/tuinzaman/cloud-platform-workload), where review
+happens. If the project is useful to you, a star on the
+[GitHub mirror](https://github.com/Tuhinzman/cloud-platform-workload) is appreciated and
+entirely optional.

@@ -4,33 +4,38 @@ Per-component evidence for the fleet. This is the single copy. The platform refe
 repository links here rather than holding a second table, because two copies of a status
 table drift apart.
 
-**Evidence status is partial, and the kinds of evidence differ.** Checkout, shipping and
-quote each have build, scan, SBOM, artifact-publication and bounded runtime evidence.
+**Evidence status is partial, and the kinds of evidence differ.** All seventeen container
+definitions were hardened and merged through GitLab merge requests !44 to !54 between
+2026-10-13 and 2026-10-16, each after its merge-request pipeline passed. Only that overall
+pipeline status is recorded here: no job log, scan report or SBOM artifact from those
+pipelines has been inspected, and no hardened image is recorded as published, admitted under
+ADR-0015, pinned in the deployment repository or run. Checkout, shipping and
+quote each have build, scan, SBOM, artifact-publication and bounded runtime evidence; quote's
+belongs to the image built before its container definition changed on 2026-10-15.
 The checkout and product-catalog container definitions were rewritten on 2026-10-13, and
 both modules moved to `go 1.26.0` with `golang.org/x/net` `v0.60.0` in the same change;
 every pipeline, publication and runtime result recorded here for those two belongs to
-images built before it, and the new state carries local validation only until a pipeline
-has run it.
+images built before it, and the new state passed its merge-request pipeline, !44.
 The shipping and currency container definitions moved on 2026-10-16 to digest-pinned images;
 every pipeline, publication and runtime result recorded here for shipping belongs to images
-built before that change, and both new definitions carry local validation only until a
-pipeline has run them.
+built before that change, and both new definitions passed their merge-request pipeline,
+!53.
 image-provider has build, scan, SBOM and artifact-publication evidence; it has no runtime
 evidence, because no runtime window has included it. Its container definition moved on
 2026-10-15 to the `1.30.6-alpine3.24-otel` base without the build-time package upgrade; that
-evidence belongs to images built before the change, and the new definition carries local
-validation only until a pipeline has run it. Two publications carry a provenance
+evidence belongs to images built before the change, and the new definition passed its
+merge-request pipeline, !48. Two publications carry a provenance
 bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
-is wired for build, scan, SBOM and container health and has published nothing. Its container
+is wired for build, scan, SBOM and container health and has no recorded publication. Its container
 definition moved on 2026-10-15 to the Envoy `v1.37.9` base with only `gettext-base` installed;
-the pipeline results recorded for it belong to the earlier definition, and the new one carries
-local validation only until a pipeline has run it. cart has
+the pipeline results recorded for it belong to the earlier definition, and the new one passed
+its merge-request pipeline, !49. cart has
 executed build, scan and SBOM on a pipeline that passed, validates container health against
 an ephemeral Valkey fixture, and has published nothing: no digest, no promotion, no
 runtime. Its container definition moved on 2026-10-15 to the .NET
 `runtime-deps:10.0.13-alpine3.24` base without the build-time package upgrade; the pipeline
-results recorded for it belong to the earlier definition, and the new one carries local
-validation only until a pipeline has run it. payment and frontend each carry build, both security gates, SBOM, container
+results recorded for it belong to the earlier definition, and the new one passed its
+merge-request pipeline, !50. payment and frontend each carry build, both security gates, SBOM, container
 health and the manual publish and evidence jobs on main; product-catalog carries all of
 those but the publication jobs, and validates container health against an ephemeral
 PostgreSQL fixture. None of the four has
@@ -44,25 +49,25 @@ currency, product-reviews, recommendation, email and ad carry build, both securi
 SBOM and container health with no publication stage. The product-reviews and recommendation
 container definitions moved on 2026-10-15 to the `python:3.12.15-alpine3.24` base without the
 runtime package upgrade, and both now run as a non-root user; the pipeline results recorded
-for them belong to the earlier definitions, and the new ones carry local validation only until
-a pipeline has run them. The ad definition moved the same day to
+for them belong to the earlier definitions, and the new ones passed their merge-request
+pipeline, !50. The ad definition moved the same day to
 `eclipse-temurin:21.0.12.1_1-jre-noble`, the Ubuntu 24.04 build of the same JRE, without the
-OpenSSL pin that no longer installed, and now runs as a non-root user; it carries local
-validation only until a pipeline has run it. fraud-detection and accounting carry
+OpenSSL pin that no longer installed, and now runs as a non-root user; it passed its
+merge-request pipeline, !51. fraud-detection and accounting carry
 build, both security gates and SBOM with no publication stage, and a running check in place
 of container health, because neither listens. The fraud-detection definition moved the same day
 to digest-pinned bases and a root-owned application directory, and its lock takes lz4-java
-`1.11.4` in place of the `1.10.1` kafka-clients asks for; it too carries local validation only
-until a pipeline has run it. The accounting and email definitions moved on 2026-10-16 to
+`1.11.4` in place of the `1.10.1` kafka-clients asks for; it too passed its merge-request
+pipeline, !51. The accounting and email definitions moved on 2026-10-16 to
 digest-pinned bases with root-owned application files and numeric non-root users, so email no
-longer runs as root; both carry local validation only until a pipeline has run them.
+longer runs as root; both passed their merge-request pipeline, !52.
 flagd-ui carries build, both security gates,
 SBOM and its eleven upstream tests, with container health deferred to runtime and no
 publication stage. Its container definition moved on 2026-10-16 to digest-pinned images, a
 root-owned release and a numeric non-root user, and its lock takes bandit 1.13.1 for a HIGH
 advisory the source gate's database did not yet carry; the pipeline results recorded for it
-belong to the earlier definition, and the new one carries local validation only until a
-pipeline has run it. Wiring is not execution, publication is not runtime evidence, and none of
+belong to the earlier definition, and the new one passed its merge-request pipeline, !54.
+Wiring is not execution, publication is not runtime evidence, and none of
 this is fleet-wide delivery. Identity and classification are facts about the source and are
 populated independently of that evidence.
 
@@ -116,6 +121,12 @@ included. ADR-0017 selects the full justified project-built inventory as the tar
 owner-selected end-to-end programme; wiring it is not delivering it. .NET was the first of
 the six tiers to be implemented, C++ the second, Python the third, Ruby the fourth, Elixir
 the fifth and Java the sixth, and nothing here says those components are delivered.
+Language checks differ in depth: payment declares no linter and no TypeScript, so its Node
+job checks only that every `.js` file in the service directory parses; product-reviews and
+recommendation check that each committed `requirements.lock` still reproduces the
+dependency install; and frontend's ESLint job, on a project-added flat configuration,
+reported zero errors and twelve unremediated warnings in its last recorded validated run on
+main.
 
 ## 2. Project-Built Configured Components
 
@@ -268,11 +279,10 @@ it on that evidence.
 
 Sixteen items. No component carries the full set: checkout, shipping and quote carry
 most of them, image-provider carries the build, scan, SBOM, registry-digest and pipeline
-items but none of the runtime ones, frontend-proxy carries its pipeline configuration
-alone, cart, payment, frontend, product-catalog, currency, product-reviews, recommendation,
-email, flagd-ui, ad, fraud-detection and accounting each carry their pipeline configuration
-and an executed build, both security gates and an SBOM with no publication or runtime behind
-them.
+items but none of the runtime ones, and frontend-proxy, cart, payment, frontend,
+product-catalog, currency, product-reviews, recommendation, email, flagd-ui, ad,
+fraud-detection and accounting each carry their pipeline configuration and an executed
+build, both security gates and an SBOM with no recorded publication or runtime behind them.
 Upstream or external image origin, classification, modification record, container
 definition or image source, reusable pipeline configuration where project-built, build
 result where project-built, current scan result, SBOM where project-built, registry digest,
