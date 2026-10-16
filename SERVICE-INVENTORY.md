@@ -25,11 +25,16 @@ evidence, because no runtime window has included it. Its container definition mo
 2026-10-15 to the `1.30.6-alpine3.24-otel` base without the build-time package upgrade; that
 evidence belongs to images built before the change, and the new definition passed its
 merge-request pipeline, !48. Two publications carry a provenance
-bundle the pipeline retained itself, shipping first and then image-provider. frontend-proxy
-is wired for build, scan, SBOM and container health and has no recorded publication. Its container
-definition moved on 2026-10-15 to the Envoy `v1.37.9` base with only `gettext-base` installed;
-the pipeline results recorded for it belong to the earlier definition, and the new one passed
-its merge-request pipeline, !49. cart has
+bundle the pipeline retained itself, shipping first and then image-provider. The five images
+published later from one pipeline each carry one too: the checkout, shipping, quote and
+image-provider bundles passed verification, and frontend-proxy's did not, so it is not
+counted as provenance. frontend-proxy
+is wired for build, scan, SBOM and container health. An earlier image was published on
+2026-09-26 and its digest read back from the registry; it has no runtime evidence. Its
+container definition moved on 2026-10-15 to the Envoy `v1.37.9` base with only `gettext-base`
+installed; the pipeline and publication results recorded for it belong to the earlier
+definition, and the new one passed its merge-request pipeline, !49, with no verified
+publication or runtime behind it. cart has
 executed build, scan and SBOM on a pipeline that passed, validates container health against
 an ephemeral Valkey fixture, and has published nothing: no digest, no promotion, no
 runtime. Its container definition moved on 2026-10-15 to the .NET
@@ -282,7 +287,9 @@ most of them, image-provider carries the build, scan, SBOM, registry-digest and 
 items but none of the runtime ones, and frontend-proxy, cart, payment, frontend,
 product-catalog, currency, product-reviews, recommendation, email, flagd-ui, ad,
 fraud-detection and accounting each carry their pipeline configuration and an executed
-build, both security gates and an SBOM with no recorded publication or runtime behind them.
+build, both security gates and an SBOM with no runtime behind them. frontend-proxy is the
+only one of them with a recorded publication, for an earlier image whose digest was read
+back from the registry; its hardened image has no verified publication.
 Upstream or external image origin, classification, modification record, container
 definition or image source, reusable pipeline configuration where project-built, build
 result where project-built, current scan result, SBOM where project-built, registry digest,

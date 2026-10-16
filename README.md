@@ -89,9 +89,13 @@ The earlier evidence belongs to images built before the hardening. Checkout, shi
 quote were each built, scanned, published with an SBOM, read back from the registry by
 digest, and exercised inside bounded EKS runtime windows: shipping carries a four-of-four
 telemetry signal digest match, and quote's induced fault and recovery were observed end to
-end. image-provider was published the same way and has not run in a window. The shipping
-and image-provider publications also had the pipeline retain the provenance itself, keeping
-the registry manifest bytes whose sha256 is the published digest. Every runtime was torn
+end. image-provider was published the same way and has not run in a window. An earlier
+frontend-proxy image was published on 2026-09-26 and its digest read back from the registry;
+it has not run in a window either. One shipping and one image-provider publication also had
+the pipeline retain the provenance itself, keeping the registry manifest bytes whose sha256 is
+the published digest, and so did the checkout, shipping, quote and image-provider images
+published alongside frontend-proxy's. The bundle the pipeline retained for frontend-proxy
+failed verification, so it is not counted as provenance. Every runtime was torn
 down, and no runtime is currently live.
 
 [SERVICE-INVENTORY.md](SERVICE-INVENTORY.md) records each component's pipeline coverage,
