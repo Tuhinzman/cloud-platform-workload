@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
-# Change: bandit raised to ~> 1.12.5 and req to ~> 0.6.1 to clear HIGH dependency advisories.
+# Change: bandit raised to ~> 1.13.0 and req to ~> 0.6.1 to clear HIGH dependency advisories.
 
 defmodule FlagdUi.MixProject do
   use Mix.Project
@@ -68,7 +68,7 @@ defmodule FlagdUi.MixProject do
       {:gettext, "~> 1.0.2"},
       {:jason, "~> 1.4.4"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.12.5"},
+      {:bandit, "~> 1.13.0"},
       {:credo, "~> 1.7.13", only: [:dev, :test], runtime: false},
       {:opentelemetry, "~> 1.7.0"},
       {:opentelemetry_api, "~> 1.5.0"},

@@ -17,13 +17,17 @@
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout. Runtime base moved to Debian bookworm with a newer OTP, packages upgraded, and ncurses moved to the supported major version.
+# Change: the builder and runner images pinned by digest, the images their tags resolved to.
+# Change: the release is copied owned by root with fixed modes, read-only to the runtime user, and /app is no
+# longer handed to that user; the runtime user is set numerically to 65534:65534, the base's nobody account.
+# Change: EXPOSE names port 4000; ${FLAGD_UI_PORT} is undefined when the image builds.
 
 ARG ELIXIR_VERSION=1.19.3
 ARG OTP_VERSION=28.1.1
 ARG DEBIAN_VERSION=bookworm-20251117-slim
 
-ARG BUILDER_IMAGE="docker.io/hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
-ARG RUNNER_IMAGE="docker.io/debian:${DEBIAN_VERSION}"
+ARG BUILDER_IMAGE="docker.io/hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}@sha256:bf38d0b96f66fdcc16c4365b558d63e1c6b281a3a8db8ea53429f9138b04f45f"
+ARG RUNNER_IMAGE="docker.io/debian:${DEBIAN_VERSION}@sha256:b4aa902587c2e61ce789849cb54c332b0400fe27b1ee33af4669e1f7e7c3e22f"
 
 FROM ${BUILDER_IMAGE} AS builder
 
@@ -88,15 +92,16 @@ ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 
 WORKDIR "/app"
-RUN chown nobody /app
 
 # set runner ENV
 ENV MIX_ENV="prod"
 
 # Only copy the final release from the build stage
-COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/flagd_ui ./
+COPY --from=builder --chmod=u=rwX,go=rX /app/_build/${MIX_ENV}/rel/flagd_ui ./
 
-EXPOSE ${FLAGD_UI_PORT}
+USER 65534:65534
+
+EXPOSE 4000
 
 # If using an environment that doesn't automatically reap zombie processes, it is
 # advised to add an init process such as tini via `apt-get install`
@@ -104,3 +109,6 @@ EXPOSE ${FLAGD_UI_PORT}
 # ENTRYPOINT ["/tini", "--"]
 
 CMD ["/app/bin/server"]
+
+# apt-get upgrade stays: even the newest bookworm-slim digest carries fixable CRITICAL findings that only the upgrade
+# clears. It and both apt-get installs read the moving Debian index, so rebuilds can differ in those packages.

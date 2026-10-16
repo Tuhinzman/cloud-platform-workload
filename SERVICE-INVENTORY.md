@@ -58,7 +58,11 @@ digest-pinned bases with root-owned application files and numeric non-root users
 longer runs as root; both carry local validation only until a pipeline has run them.
 flagd-ui carries build, both security gates,
 SBOM and its eleven upstream tests, with container health deferred to runtime and no
-publication stage. Wiring is not execution, publication is not runtime evidence, and none of
+publication stage. Its container definition moved on 2026-10-16 to digest-pinned images, a
+root-owned release and a numeric non-root user, and its lock takes bandit 1.13.1 for a HIGH
+advisory the source gate's database did not yet carry; the pipeline results recorded for it
+belong to the earlier definition, and the new one carries local validation only until a
+pipeline has run it. Wiring is not execution, publication is not runtime evidence, and none of
 this is fleet-wide delivery. Identity and classification are facts about the source and are
 populated independently of that evidence.
 
@@ -254,6 +258,11 @@ the blind spot recorded above.
 The gate blocks on fixable HIGH and CRITICAL, the same threshold and the same
 `--ignore-unfixed` semantics the image gate uses. Findings without an available fix are
 reported and not hidden.
+
+A passing source gate is only as current as the scanner's database. On 2026-10-16 the
+database of 2026-10-15 reported nothing against bandit 1.12.5, while `mix deps.get` printed,
+and OSV listed, a HIGH advisory against it, EEF-CVE-2026-105659; flagd-ui's lock was moved off
+it on that evidence.
 
 ## Evidence Owed by Every Deployed Component
 
