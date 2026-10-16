@@ -3,21 +3,30 @@
 
 # Modified from the upstream OpenTelemetry Demo release 2.2.0.
 # Change: COPY source paths retargeted from src/ to services/ for this repository layout.
-# Change: libssl3t64 3.5.7-1~deb13u3, Debian's fix for DSA-6531-1, is installed over the distroless
-# base, which still ships deb13u2, and the base is pinned by digest.
+# Change: the builder pinned by digest to rust:1.91.1, the image the 1.91 tag resolved to. The runtime pinned to the
+# newest distroless cc-debian13 digest, which carries libssl3t64 3.5.7-1~deb13u3 itself, so the stage that installed
+# it over the older base is removed.
+# Change: an amd64 target built on an arm64 host is cross-compiled, as an arm64 target on an amd64 host already was;
+# before, that build put an arm64 binary into the amd64 image.
+# Change: every cargo build passes --locked, so a stale Cargo.lock fails the build instead of being re-resolved.
+# Change: /app is created by root; the runtime user is set numerically to 65532:65532 and cannot replace the binary.
+# Change: EXPOSE names port 8080; ${SHIPPING_PORT} is undefined when the image builds.
 
-FROM --platform=${BUILDPLATFORM} docker.io/library/rust:1.91 AS builder
+FROM --platform=${BUILDPLATFORM} docker.io/library/rust:1.91.1@sha256:867f1d1162913c401378a8504fb17fe2032c760dc316448766f150a130204aad AS builder
 ARG TARGETARCH
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
 RUN echo Building on ${BUILDPLATFORM} for ${TARGETPLATFORM}
 
-# Install dependencies - cross-compilation setup for ARM64, native otherwise
+# Install dependencies - cross-compilation setup when the target differs from the build host, native otherwise
 RUN apt-get update && \
     if [ "${TARGETPLATFORM}" = "linux/arm64" ] && [ "${BUILDPLATFORM}" != "linux/arm64" ] ; then \
         apt-get install --no-install-recommends -y g++-aarch64-linux-gnu libc6-dev-arm64-cross libprotobuf-dev protobuf-compiler ca-certificates && \
         rustup target add aarch64-unknown-linux-gnu; \
+    elif [ "${TARGETPLATFORM}" = "linux/amd64" ] && [ "${BUILDPLATFORM}" != "linux/amd64" ] ; then \
+        apt-get install --no-install-recommends -y g++-x86-64-linux-gnu libc6-dev-amd64-cross libprotobuf-dev protobuf-compiler ca-certificates && \
+        rustup target add x86_64-unknown-linux-gnu; \
     else \
         apt-get install --no-install-recommends -y g++ libc6-dev libprotobuf-dev protobuf-compiler ca-certificates; \
     fi
@@ -26,47 +35,34 @@ WORKDIR /app/
 
 COPY /services/shipping/ /app/
 
-# Build - cross-compile for ARM64 or native build
+# Build - cross-compile when the target differs from the build host, native otherwise
 RUN if [ "${TARGETPLATFORM}" = "linux/arm64" ] && [ "${BUILDPLATFORM}" != "linux/arm64" ] ; then \
         env CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
             CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
             CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
-        cargo build -r --target aarch64-unknown-linux-gnu && \
+        cargo build -r --locked --target aarch64-unknown-linux-gnu && \
         cp /app/target/aarch64-unknown-linux-gnu/release/shipping /app/target/release/shipping; \
+    elif [ "${TARGETPLATFORM}" = "linux/amd64" ] && [ "${BUILDPLATFORM}" != "linux/amd64" ] ; then \
+        env CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc \
+            CC_x86_64_unknown_linux_gnu=x86_64-linux-gnu-gcc \
+            CXX_x86_64_unknown_linux_gnu=x86_64-linux-gnu-g++ \
+        cargo build -r --locked --target x86_64-unknown-linux-gnu && \
+        cp /app/target/x86_64-unknown-linux-gnu/release/shipping /app/target/release/shipping; \
     else \
-        cargo build -r; \
+        cargo build -r --locked; \
     fi
 
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2
 
-# libssl3t64 3.5.7-1~deb13u3 fixes DSA-6531-1, which no distroless build carries yet. It is installed
-# the way the base installs every package: the .deb's files, plus its control and md5sums as the
-# status.d entries the scanner reads. The build fails once the base itself reaches this version.
-FROM docker.io/library/debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS libssl3t64
-ARG TARGETARCH
-ADD https://snapshot.debian.org/archive/debian-security/20260930T060347Z/pool/updates/main/o/openssl/libssl3t64_3.5.7-1~deb13u3_amd64.deb /debs/amd64.deb
-ADD https://snapshot.debian.org/archive/debian-security/20260930T060347Z/pool/updates/main/o/openssl/libssl3t64_3.5.7-1~deb13u3_arm64.deb /debs/arm64.deb
-COPY --from=gcr.io/distroless/cc-debian13:nonroot@sha256:54df941ed0d06a1bd95ef5e0ce391fd8d9f94b64782dc9a60062727849ee3f97 /var/lib/dpkg/status.d/libssl3t64 /base-status
-RUN printf '%s  %s\n' \
-        ff16bc048bcd7d1b256094450b79c77947d8e76fe2a24bd99b91021d591fa074 /debs/amd64.deb \
-        d0681293a160392186c6ef85a165e40603d1628a099936137d24d391bd591f97 /debs/arm64.deb \
-        > /debs/SHA256SUMS && \
-    sha256sum -c /debs/SHA256SUMS && \
-    base="$(sed -n 's/^Version: //p' /base-status)" && \
-    if dpkg --compare-versions "$base" ge 3.5.7-1~deb13u3; then echo "base has libssl3t64 $base: remove this stage"; exit 1; fi && \
-    dpkg-deb -x "/debs/$TARGETARCH.deb" /pkg && \
-    dpkg-deb -e "/debs/$TARGETARCH.deb" /ctrl && \
-    mkdir -p /pkg/var/lib/dpkg/status.d && \
-    cp /ctrl/control /pkg/var/lib/dpkg/status.d/libssl3t64 && \
-    cp /ctrl/md5sums /pkg/var/lib/dpkg/status.d/libssl3t64.md5sums
-
-FROM gcr.io/distroless/cc-debian13:nonroot@sha256:54df941ed0d06a1bd95ef5e0ce391fd8d9f94b64782dc9a60062727849ee3f97
-
-COPY --from=libssl3t64 /pkg/ /
-
+USER 0:0
 WORKDIR /app
 
 COPY --from=builder /app/target/release/shipping shipping
 
-EXPOSE ${SHIPPING_PORT}
+USER 65532:65532
+
+EXPOSE 8080
 
 CMD ["./shipping"]
+
+# WORKDIR creates its directory as the current user, and the nonroot base sets 65532, so root creates it here.

@@ -11,6 +11,10 @@ both modules moved to `go 1.26.0` with `golang.org/x/net` `v0.60.0` in the same 
 every pipeline, publication and runtime result recorded here for those two belongs to
 images built before it, and the new state carries local validation only until a pipeline
 has run it.
+The shipping and currency container definitions moved on 2026-10-16 to digest-pinned images;
+every pipeline, publication and runtime result recorded here for shipping belongs to images
+built before that change, and both new definitions carry local validation only until a
+pipeline has run them.
 image-provider has build, scan, SBOM and artifact-publication evidence; it has no runtime
 evidence, because no runtime window has included it. Its container definition moved on
 2026-10-15 to the `1.30.6-alpine3.24-otel` base without the build-time package upgrade; that
