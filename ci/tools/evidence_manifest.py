@@ -8,12 +8,14 @@ is worse than no bundle: it would look like provenance without being it.
 """
 
 import argparse
+import datetime
 import hashlib
 import json
 import pathlib
+import re
 import sys
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 REQUIRED = (
     "schema_version",
@@ -33,6 +35,9 @@ REQUIRED = (
     "scanner_version",
     "publication_timestamp",
     "promotion_eligible_basis",
+    "commit_tag",
+    "readable_tag",
+    "release_version",
 )
 
 # Schema 2 retains the raw basis for two claims schema 1 carried only as derived values: the
@@ -42,6 +47,17 @@ REQUIRED = (
 # and schema 1 bundles are still valid records of what they measured.
 GATE_RC_FILE = "trivy-gate-rc.txt"
 DB_METADATA_FILE = "trivy-db-metadata.json"
+
+# Schema 3 adds the readable image tag: its version and both tags are checked against
+# the pipeline and the published digest, and the three files they come from are retained. The
+# version and timestamp rules match ci/templates/ecr-publish.yml.
+RELEASE_VERSION_FILE = "release-version.txt"
+READABLE_TAG_FILE = "readable-tag.txt"
+PUBLISHED_TAGS_FILE = "published-tags.txt"
+VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
+UTC_TIMESTAMP_PATTERN = re.compile(
+    r"[1-9][0-9]{3}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z"
+)
 
 PROMOTION_BASIS = (
     "the blocking gate exited 0 as retained in " + GATE_RC_FILE + ", the published digest is the "
@@ -131,6 +147,61 @@ def db_metadata(path):
     return kept or None
 
 
+def one_line(data, what):
+    text = data.decode()
+    if not text.endswith("\n") or "\n" in text[:-1]:
+        raise EvidenceError(f"{what}: expected exactly one line")
+    return text[:-1]
+
+
+def tag_fields(args, published_digest):
+    """Both published tags, cross-checked against the pipeline and the published digest."""
+    version_raw = read(args.release_version_file, "release version")
+    readable_raw = read(args.readable_tag_file, "readable tag")
+    tags_raw = read(args.published_tags_file, "published tags")
+
+    version = one_line(version_raw, "release version")
+    if not VERSION_PATTERN.fullmatch(version):
+        raise EvidenceError(f"release version {version!r} is not MAJOR.MINOR.PATCH")
+    created = args.pipeline_created_at
+    if not UTC_TIMESTAMP_PATTERN.fullmatch(created):
+        raise EvidenceError(f"pipeline creation time {created!r} is not a UTC timestamp YYYY-MM-DDTHH:MM:SSZ")
+    try:
+        datetime.datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise EvidenceError(f"pipeline creation time {created!r} names a day that does not exist") from exc
+    if not args.pipeline_id.isdigit():
+        raise EvidenceError(f"pipeline id {args.pipeline_id!r} is not numeric")
+    readable = one_line(readable_raw, "readable tag")
+    expected = f"{created[:10].replace('-', '.')}-build.{args.pipeline_id}-v{version}"
+    if readable != expected:
+        raise EvidenceError(f"readable tag {readable} is not {expected}")
+    commit_tag = args.source_commit[:8]
+    expected_lines = f"{commit_tag} {published_digest}\n{readable} {published_digest}\n"
+    if tags_raw.decode() != expected_lines:
+        raise EvidenceError(
+            f"published tags do not show {commit_tag} and {readable} both at {published_digest}: "
+            f"{tags_raw.decode().splitlines()}"
+        )
+
+    fields = {
+        "commit_tag": commit_tag,
+        "readable_tag": readable,
+        "release_version": version,
+        "pipeline_created_at": created,
+        "published_tags": [
+            {"tag": commit_tag, "digest": published_digest},
+            {"tag": readable, "digest": published_digest},
+        ],
+        "published_tags_basis": (
+            "the publish job read both tags back from the registry as the published digest, "
+            "retained in " + PUBLISHED_TAGS_FILE
+        ),
+    }
+    raw = {RELEASE_VERSION_FILE: version_raw, READABLE_TAG_FILE: readable_raw, PUBLISHED_TAGS_FILE: tags_raw}
+    return fields, raw
+
+
 def build(args):
     trivy_raw = read(args.trivy, "trivy report")
     sbom_raw = read(args.sbom, "sbom")
@@ -172,6 +243,7 @@ def build(args):
         raise EvidenceError(f"trivy RepoTags {repo_tags} do not carry source commit {short}")
     if gate_rc_text != "0":
         raise EvidenceError(f"blocking security gate exited {gate_rc_text}; no artifact is eligible")
+    tags, tags_raw = tag_fields(args, published_digest)
 
     counts = severity_counts(trivy)
     db = db_metadata(args.db_metadata)
@@ -200,6 +272,9 @@ def build(args):
     )
     limitations.append(
         "a point-in-time result for the recorded scan timestamp, not a current vulnerability attestation"
+    )
+    limitations.append(
+        "the tag read-back is the publish job's registry answer; this job makes no registry call"
     )
 
     manifest = {
@@ -249,6 +324,7 @@ def build(args):
         "promotion_eligible_basis": PROMOTION_BASIS,
         "limitations": limitations,
     }
+    manifest.update(tags)
 
     missing = [field for field in REQUIRED if not manifest.get(field)]
     if missing:
@@ -261,6 +337,7 @@ def build(args):
     }
     if db_raw:
         raw[DB_METADATA_FILE] = db_raw
+    raw.update(tags_raw)
     return manifest, raw
 
 
@@ -290,6 +367,10 @@ def main(argv=None):
     parser.add_argument("--component-class", default="project-built-application-service")
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--pipeline-id", required=True)
+    parser.add_argument("--pipeline-created-at", required=True)
+    parser.add_argument("--release-version-file", required=True)
+    parser.add_argument("--readable-tag-file", required=True)
+    parser.add_argument("--published-tags-file", required=True)
     parser.add_argument("--trivy", required=True)
     parser.add_argument("--sbom", required=True)
     parser.add_argument("--registry-manifest", required=True)

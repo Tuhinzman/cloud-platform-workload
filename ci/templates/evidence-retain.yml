@@ -15,6 +15,7 @@
         --component-class "${COMPONENT_CLASS}" \
         --source-commit "${CI_COMMIT_SHA}" \
         --pipeline-id "${CI_PIPELINE_ID}" \
+        --pipeline-created-at "${CI_PIPELINE_CREATED_AT}" \
         --build-job-id "$(cat build-job-id.txt 2>/dev/null || true)" \
         --scan-job-id "$(cat scan-job-id.txt 2>/dev/null || true)" \
         --publish-job-id "$(cat publish-job-id.txt 2>/dev/null || true)" \
@@ -24,6 +25,9 @@
         --db-metadata trivy-db-metadata.json \
         --registry-manifest registry-manifest.json \
         --digest-file digest.txt \
+        --release-version-file release-version.txt \
+        --readable-tag-file readable-tag.txt \
+        --published-tags-file published-tags.txt \
         --gate-rc-file trivy-gate-rc.txt \
         --publication-timestamp "$(cat published-at.txt)" \
         --out-dir evidence

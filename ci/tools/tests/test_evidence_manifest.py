@@ -23,6 +23,10 @@ import evidence_manifest as em  # noqa: E402
 COMMIT = "7890d4bb6f8427899ca2224a9281a51e822b4994"
 CONFIG = "sha256:" + "a" * 64
 FIXTURE_MARK = "TEST FIXTURE - NOT HISTORICAL EVIDENCE - NOT SECURITY EVIDENCE"
+PIPELINE_ID = "2827817067"
+CREATED_AT = "2026-09-07T20:36:40Z"
+VERSION = "1.4.2"
+READABLE = "2026.09.07-build.2827817067-v1.4.2"
 
 
 def trivy_report(config=CONFIG, tags=None, vulns=None):
@@ -69,7 +73,8 @@ def registry_manifest(config=CONFIG, layers=2):
 class Bundle:
     """Writes one synthetic input set and returns generator arguments for it."""
 
-    def __init__(self, root, trivy=None, sbom=None, manifest=None, digest=None, gate_rc="0", db=True):
+    def __init__(self, root, trivy=None, sbom=None, manifest=None, digest=None, gate_rc="0", db=True,
+                 version_text=VERSION + "\n", readable=READABLE, tags_text=None):
         self.root = pathlib.Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         manifest_obj = registry_manifest() if manifest is None else manifest
@@ -84,6 +89,12 @@ class Bundle:
             self.write("db.json", {"VulnerabilityDB": {"Version": 2, "UpdatedAt": "2026-09-07T12:00:00Z"}})
         self.db = db
         self.digest = digest or computed
+        if version_text is not None:
+            (self.root / "release-version.txt").write_text(version_text)
+        (self.root / "readable-tag.txt").write_text(readable + "\n")
+        if tags_text is None:
+            tags_text = f"{COMMIT[:8]} {self.digest}\n{readable} {self.digest}\n"
+        (self.root / "published-tags.txt").write_text(tags_text)
 
     def write(self, name, obj):
         path = self.root / name
@@ -93,7 +104,11 @@ class Bundle:
         argv = [
             "--component", "shipping",
             "--source-commit", COMMIT,
-            "--pipeline-id", "2827817067",
+            "--pipeline-id", PIPELINE_ID,
+            "--pipeline-created-at", CREATED_AT,
+            "--release-version-file", str(self.root / "release-version.txt"),
+            "--readable-tag-file", str(self.root / "readable-tag.txt"),
+            "--published-tags-file", str(self.root / "published-tags.txt"),
             "--trivy", str(self.root / "trivy-findings.json"),
             "--sbom", str(self.root / "sbom.cdx.json"),
             "--registry-manifest", str(self.root / "registry-manifest.json"),
@@ -128,7 +143,10 @@ class EvidenceManifestTest(unittest.TestCase):
         self.assertEqual(
             [
                 "evidence-manifest.json",
+                "published-tags.txt",
+                "readable-tag.txt",
                 "registry-manifest.json",
+                "release-version.txt",
                 "sbom.cdx.json",
                 "trivy-db-metadata.json",
                 "trivy-findings.json",
@@ -137,7 +155,7 @@ class EvidenceManifestTest(unittest.TestCase):
             names,
         )
         m = self.read_manifest(b.digest)
-        self.assertEqual(2, m["schema_version"])
+        self.assertEqual(3, m["schema_version"])
         self.assertEqual("DIRECT", m["published_digest_binding"])
         self.assertEqual(b.digest, m["published_image_digest"])
         self.assertEqual(CONFIG, m["image_config_digest"])
@@ -317,13 +335,88 @@ class EvidenceManifestTest(unittest.TestCase):
         self.assertEqual("DIRECT", loaded["published_digest_binding"])
         self.assertNotIn("promotion_eligible_basis", loaded)
         self.assertEqual(before, path.read_bytes())
-        self.assertEqual(2, em.SCHEMA_VERSION)
+        self.assertEqual(3, em.SCHEMA_VERSION)
 
     def test_new_bundle_files_are_covered_by_the_identity_refusal(self):
         """The overwrite guard must cover the schema 2 files, not just the original three."""
         b = Bundle(self.root / "in")
         self.assertEqual(0, em.main(b.argv(self.root / "out")))
         (self.bundle_path(b.digest) / "trivy-gate-rc.txt").write_bytes(b"0\n\n")
+        self.assertEqual(1, em.main(b.argv(self.root / "out")))
+
+    def test_readable_tag_is_retained_with_version_pipeline_commit_and_digest(self):
+        """Schema 3: one bundle names the version, both tags, the pipeline, the commit and the digest."""
+        b = Bundle(self.root / "in")
+        self.assertEqual(0, em.main(b.argv(self.root / "out")))
+        m = self.read_manifest(b.digest)
+        self.assertEqual(
+            (VERSION, READABLE, COMMIT[:8], PIPELINE_ID, COMMIT, b.digest, CREATED_AT),
+            (m["release_version"], m["readable_tag"], m["commit_tag"], m["pipeline_id"], m["source_commit"],
+             m["published_image_digest"], m["pipeline_created_at"]),
+        )
+        self.assertEqual(
+            [{"tag": COMMIT[:8], "digest": b.digest}, {"tag": READABLE, "digest": b.digest}], m["published_tags"]
+        )
+        bundle = self.bundle_path(b.digest)
+        for name in ("release-version.txt", "readable-tag.txt", "published-tags.txt"):
+            self.assertEqual((b.root / name).read_bytes(), (bundle / name).read_bytes(), name)
+
+    def test_missing_release_version_fails(self):
+        b = Bundle(self.root / "in", version_text=None)
+        self.assertEqual(1, em.main(b.argv(self.root / "out")))
+        self.assertFalse((self.root / "out").exists())
+
+    def test_invalid_release_versions_fail(self):
+        for i, text in enumerate(("v1.4.2\n", "1.4\n", "01.4.2\n", "1.4.2-rc.1\n", "1.4.2\n1.4.3\n", "1.4.2\n\n", "1.4.2",
+                                  " 1.4.2\n")):
+            with self.subTest(text=text):
+                b = Bundle(self.root / f"invalid-{i}", version_text=text,
+                           readable=f"2026.09.07-build.{PIPELINE_ID}-v{text.strip()}")
+                self.assertEqual(1, em.main(b.argv(self.root / "out-invalid")))
+        self.assertFalse((self.root / "out-invalid").exists())
+
+    def test_readable_tag_that_does_not_follow_the_pipeline_fails(self):
+        for readable in (
+            "2026.09.08-build.2827817067-v1.4.2",
+            "2026.09.07-build.2827817068-v1.4.2",
+            "2026.09.07-build.2827817067-v1.4.3",
+            "2026-09-07-build.2827817067-v1.4.2",
+        ):
+            with self.subTest(readable=readable):
+                b = Bundle(self.root / readable, readable=readable)
+                self.assertEqual(1, em.main(b.argv(self.root / "out-mismatch")))
+        self.assertFalse((self.root / "out-mismatch").exists())
+
+    def test_creation_time_that_is_not_a_real_utc_timestamp_fails(self):
+        b = Bundle(self.root / "in")
+        for created in ("2026-09-07T22:36:40+02:00", "", "2026-99-99TgarbageZ", "2026-02-30T00:00:00Z", "2026-02-29T12:00:00Z",
+                        "2100-02-29T12:00:00Z", "2026-04-31T00:00:00Z", "2026-09-07T24:00:00Z", "2026-09-07T20:36:60Z",
+                        "2026-09-07T20:36:40.123Z", "0999-09-07T20:36:40Z", "2026-09-07T20:36:40Z\n2026-09-08T00:00:00Z"):
+            with self.subTest(created=created):
+                self.assertEqual(1, em.main(b.argv(self.root / "out", pipeline_created_at=created)))
+        self.assertFalse((self.root / "out").exists())
+
+    def test_a_real_leap_day_is_accepted(self):
+        readable = f"2028.02.29-build.{PIPELINE_ID}-v{VERSION}"
+        b = Bundle(self.root / "in", readable=readable)
+        self.assertEqual(0, em.main(b.argv(self.root / "out", pipeline_created_at="2028-02-29T12:00:00Z")))
+        self.assertEqual(readable, self.read_manifest(b.digest)["readable_tag"])
+
+    def test_published_tags_at_another_digest_fail(self):
+        b = Bundle(self.root / "in")
+        other = "sha256:" + "e" * 64
+        b.root.joinpath("published-tags.txt").write_text(f"{COMMIT[:8]} {b.digest}\n{READABLE} {other}\n")
+        self.assertEqual(1, em.main(b.argv(self.root / "out")))
+
+    def test_commit_tag_that_is_not_the_source_commit_fails(self):
+        b = Bundle(self.root / "in")
+        b.root.joinpath("published-tags.txt").write_text(f"deadbeef {b.digest}\n{READABLE} {b.digest}\n")
+        self.assertEqual(1, em.main(b.argv(self.root / "out")))
+
+    def test_tag_files_are_covered_by_the_identity_refusal(self):
+        b = Bundle(self.root / "in")
+        self.assertEqual(0, em.main(b.argv(self.root / "out")))
+        (self.bundle_path(b.digest) / "readable-tag.txt").write_bytes(b"2026.09.07-build.1-v1.4.2\n")
         self.assertEqual(1, em.main(b.argv(self.root / "out")))
 
 if __name__ == "__main__":

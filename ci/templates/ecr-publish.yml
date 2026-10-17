@@ -1,5 +1,6 @@
-# Publishes the scanned image.tar. Only the repository name is set per service; the registry
-# host and role ARN are masked project variables because they identify the account.
+# Publishes the scanned image.tar under its commit tag and its readable tag. Only the repository
+# name is set per service; the registry host and role ARN are masked project variables because
+# they identify the account.
 
 .ecr-publish-template:
   extends: .docker-dind
@@ -16,6 +17,36 @@
   before_script:
     - apk add --no-cache aws-cli
   script:
+    # The readable tag's version is only the service's committed, owner-approved VERSION file,
+    # checked as raw bytes; nothing is pushed until it and the UTC pipeline time are valid. The
+    # timestamp rule matches ci/tools/evidence_manifest.py.
+    - |
+      fail() { echo "FAIL: $*"; exit 1; }
+      version_file="${SERVICE_PATH}/VERSION"
+      [ -f "${version_file}" ] || fail "${version_file} is missing; commit the owner-approved MAJOR.MINOR.PATCH version first"
+      [ "$(grep -c '' "${version_file}")" = 1 ] \
+        && [ "$(grep -Ecx '(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)' "${version_file}")" = 1 ] \
+        || fail "${version_file} must hold exactly one line, a MAJOR.MINOR.PATCH version"
+      version=$(cat "${version_file}")
+      created=${CI_PIPELINE_CREATED_AT}
+      [ "$(printf '%s' "${created}" | grep -c '')" = 1 ] \
+        && printf '%s\n' "${created}" | grep -Eqx '[1-9][0-9]{3}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z' \
+        || fail "CI_PIPELINE_CREATED_AT '${created}' is not a UTC timestamp YYYY-MM-DDTHH:MM:SSZ"
+      year=$(printf '%s' "${created}" | cut -c1-4)
+      day=$(printf '%s' "${created}" | cut -c9-10)
+      case "$(printf '%s' "${created}" | cut -c6-7)" in
+        02) if [ $((year % 4)) = 0 ] && { [ $((year % 100)) != 0 ] || [ $((year % 400)) = 0 ]; }; then last=29; else last=28; fi ;;
+        04 | 06 | 09 | 11) last=30 ;;
+        *) last=31 ;;
+      esac
+      [ "${day#0}" -le "${last}" ] || fail "CI_PIPELINE_CREATED_AT '${created}' names a day that does not exist"
+      case "${CI_PIPELINE_ID}" in
+        '' | *[!0-9]*) fail "CI_PIPELINE_ID '${CI_PIPELINE_ID}' is not a pipeline id" ;;
+      esac
+      readable_tag="$(printf '%s' "${created}" | cut -c1-10 | tr - .)-build.${CI_PIPELINE_ID}-v${version}"
+      printf '%s\n' "${version}" > release-version.txt
+      printf '%s\n' "${readable_tag}" > readable-tag.txt
+      echo "commit tag ${CI_COMMIT_SHORT_SHA}, readable tag ${readable_tag}"
     - |
       creds=$(aws sts assume-role-with-web-identity \
         --role-arn "${AWS_ROLE_ARN}" \
@@ -30,35 +61,59 @@
     - docker load -i image.tar
     - docker tag "${SERVICE_NAME}:${CI_COMMIT_SHORT_SHA}" "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}"
     - aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REGISTRY}"
-    - docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}"
-    # The registry's own digest from the push. Only the digest is written, since the full
-    # reference carries the account.
-    - docker inspect --format='{{index .RepoDigests 0}}' "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}" | cut -d@ -f2 > digest.txt
-    - cat digest.txt
-    # Keep the manifest bytes exact (command substitution drops the CLI's newline) so their
-    # SHA-256 is the digest; the evidence stage verifies it. A missing digest returns None,
-    # not an error, so the returned digest must equal the pushed one.
+    # A published tag is never adopted or overwritten, so a retry after any push fails closed. The
+    # commit tag binds to the tested image.tar through this job's own push (the client's and the
+    # registry's digests must agree), and the readable tag is added only to manifest bytes that
+    # hash to that digest. Any registry error or mismatch fails the job.
     - |
-      published=$(cat digest.txt)
-      fetch() {
-        aws ecr batch-get-image \
-          --repository-name "${ECR_REPOSITORY}" \
-          --image-ids imageDigest="${published}" \
-          --accepted-media-types "application/vnd.docker.distribution.manifest.v2+json" "application/vnd.oci.image.manifest.v1+json" \
-          --query "$1" \
-          --output text
+      media_types="application/vnd.docker.distribution.manifest.v2+json application/vnd.oci.image.manifest.v1+json"
+      lookup() {
+        answer=$(aws ecr batch-get-image --repository-name "${ECR_REPOSITORY}" --image-ids "$1" \
+          --accepted-media-types ${media_types} --query "$2" --output text) || fail "registry lookup of $1 failed"
       }
-      returned=$(fetch 'images[0].imageId.imageDigest')
-      manifest=$(fetch 'images[0].imageManifest')
-      if [ "${returned}" != "${published}" ]; then
-        echo "ECR returned digest '${returned}' for published digest '${published}'"
-        exit 1
-      fi
-      case "${manifest}" in
-        "{"*) ;;
-        *) echo "ECR returned no manifest document for ${published}"; exit 1 ;;
-      esac
-      printf '%s' "${manifest}" > registry-manifest.json
+      tag_digest() {
+        name=$1
+        lookup "imageTag=${name}" '[images[0].imageId.imageDigest, failures[0].failureCode]'
+        set -- ${answer}
+        case "$#:$1:$2" in
+          2:None:ImageNotFound) found=NONE ;;
+          2:sha256:*:None) found=$1 ;;
+          *) fail "unexpected registry answer for tag ${name}: ${answer}" ;;
+        esac
+      }
+      readable_tag=$(cat readable-tag.txt)
+      for tag in "${CI_COMMIT_SHORT_SHA}" "${readable_tag}"; do
+        tag_digest "${tag}"
+        [ "${found}" = NONE ] || fail "tag ${tag} already exists as ${found}; a published tag is never adopted or overwritten"
+      done
+      docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}" || fail "push of the commit tag failed"
+      # Only the digest is kept, since the full reference carries the account.
+      pushed=$(docker inspect --format='{{index .RepoDigests 0}}' "${ECR_REGISTRY}/${ECR_REPOSITORY}:${CI_COMMIT_SHORT_SHA}" | cut -d@ -f2)
+      tag_digest "${CI_COMMIT_SHORT_SHA}"
+      [ -n "${pushed}" ] && [ "${found}" = "${pushed}" ] \
+        || fail "the push reported '${pushed}' but the commit tag reads back as ${found}"
+      published=${found}
+      # Keep the manifest bytes exact (command substitution drops the CLI's newline); the evidence
+      # stage verifies them again.
+      lookup "imageDigest=${published}" 'images[0].imageManifest'
+      case "${answer}" in "{"*) ;; *) fail "ECR returned no manifest document for ${published}" ;; esac
+      printf '%s' "${answer}" > registry-manifest.json
+      [ "sha256:$(sha256sum registry-manifest.json | cut -d' ' -f1)" = "${published}" ] \
+        || fail "the manifest ECR returned does not hash to ${published}; no tag is added"
+      lookup "imageDigest=${published}" 'images[0].imageManifestMediaType'
+      media_type=${answer}
+      case " ${media_types} " in *" ${media_type} "*) ;; *) fail "unexpected manifest media type '${media_type}'" ;; esac
+      aws ecr put-image --repository-name "${ECR_REPOSITORY}" --image-tag "${readable_tag}" \
+        --image-manifest file://registry-manifest.json --image-manifest-media-type "${media_type}" \
+        --image-digest "${published}" --query 'image.imageId.imageDigest' --output text > /dev/null \
+        || fail "adding readable tag ${readable_tag} to ${published} failed"
+      for tag in "${CI_COMMIT_SHORT_SHA}" "${readable_tag}"; do
+        tag_digest "${tag}"
+        [ "${found}" = "${published}" ] || fail "tag ${tag} reads back as ${found}, not ${published}"
+      done
+      printf '%s\n' "${published}" > digest.txt
+      printf '%s %s\n' "${CI_COMMIT_SHORT_SHA}" "${published}" "${readable_tag}" "${published}" > published-tags.txt
+      cat published-tags.txt
     - date -u +%Y-%m-%dT%H:%M:%SZ > published-at.txt
     - printf '%s\n' "${CI_JOB_ID}" > publish-job-id.txt
   artifacts:
@@ -68,6 +123,9 @@
       - registry-manifest.json
       - published-at.txt
       - publish-job-id.txt
+      - release-version.txt
+      - readable-tag.txt
+      - published-tags.txt
     expire_in: never
   # Manual on purpose: enabling CI must never publish by itself. The changes list mirrors the
   # other artifact-chain templates, and each service's publish job also needs its scans, so
