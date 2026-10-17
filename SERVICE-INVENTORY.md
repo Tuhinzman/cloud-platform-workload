@@ -10,7 +10,8 @@ All seventeen container definitions were hardened and merged through GitLab merg
 to !54 between 2026-10-13 and 2026-10-16, each after its merge-request pipeline passed. That
 overall pipeline status is the only result recorded for the hardened definitions. No job log,
 scan report or SBOM artifact from those pipelines has been inspected, and no hardened image is
-recorded as published, admitted under ADR-0015, pinned in the deployment repository or run.
+recorded as published, pinned in the deployment repository or run. These are workload images:
+ADR-0009 and ADR-0014 govern them, and ADR-0015 governs platform-managed runtime components.
 
 Every other result in this file belongs to an image built before its definition was hardened:
 
@@ -79,7 +80,7 @@ Each kind of evidence shows one thing and is never counted as another.
 | Container health | A CI check that the image starts and listens, or that a worker stays up. See Container Health Disposition below. |
 | Publication | The image was published to the registry and its digest read back. Publication is not runtime evidence. |
 | Provenance | A bundle the pipeline retained for a published image passed verification. A bundle that failed is not counted. |
-| Admission | Admission under ADR-0015. No hardened image is recorded as admitted. |
+| Governing records | ADR-0009 sets the security gate, the SBOM, digest identity and promotion for these images, and ADR-0014 extends the same threshold to justified upstream workload components. ADR-0015 admission applies only to platform-managed runtime components. |
 | EKS runtime | The image ran inside a bounded EKS runtime window. |
 
 ## 1. Project-Built Application Services
@@ -175,14 +176,15 @@ Full justification is in [UPSTREAM-EXCEPTIONS.md](UPSTREAM-EXCEPTIONS.md).
 
 ## 4. Infrastructure Dependencies
 
-Required by the application but not application services. Their deployment form is an open
-implementation decision with its own cost gate, so no form is recorded here.
+Required by the application but not application services. For the message broker and the cache,
+the deployment form is an open implementation decision with its own cost gate, so no form is
+recorded. The durable datastore has an implemented Dev configuration, which is not running now.
 
 | Component | Role | Form |
 |---|---|---|
 | Message broker | Carries the asynchronous producer to consumer path | Undecided. In-cluster or managed. |
 | Cache | Sits behind the cart | Undecided. In-cluster or managed. |
-| Durable datastore | Holds data that must outlive its environment | Undecided product, constrained to a managed service with native backup |
+| Durable datastore | Holds data that must outlive its environment | Amazon RDS for PostgreSQL 17.11, a managed service with native backup, implemented for Dev in the reference repository's `terraform/dev-datastore`. The instance was decommissioned on 2026-10-06 and has not been recreated, and no workload ever connected to it. Its final snapshot is retained; restoring from it has not been validated. |
 
 ## 5. Not Deployed
 
