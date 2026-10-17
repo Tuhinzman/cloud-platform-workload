@@ -83,7 +83,9 @@ The Dockerfile and merge-request CI milestone is complete for all seventeen comp
 each hardened definition was merged through a GitLab merge request, !44 to !54, after its
 merge-request pipeline passed. Only the pipelines' overall status is recorded; their job
 logs and artifacts have not been inspected for this record. The milestone is not delivery. No hardened image is recorded as published to ECR,
-and none is pinned in the deployment repository, admitted under ADR-0015 or run on AWS.
+and none is pinned in the deployment repository or run on AWS. Publication, digest binding and
+EKS runtime validation of the hardened images remain unverified. ADR-0009 and ADR-0014 govern
+these workload images; ADR-0015 governs platform-managed runtime components.
 
 The earlier evidence belongs to images built before the hardening. Checkout, shipping and
 quote were each built, scanned, published with an SBOM, read back from the registry by
