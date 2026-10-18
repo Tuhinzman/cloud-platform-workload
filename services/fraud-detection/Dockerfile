@@ -27,7 +27,7 @@ RUN gradle shadowJar
 
 # -----------------------------------------------------------------------------
 
-FROM gcr.io/distroless/java17-debian13:nonroot@sha256:b318d135426b282db46c3e2601edeb41eb7b157d9ab75d2f9499743180cddf0e
+FROM gcr.io/distroless/java17-debian13:nonroot@sha256:9bd5eb41f0a77adcbc10ff1c7ddcfddeada1796ca0dc827fe289269bd1339284
 
 ARG OTEL_JAVA_AGENT_VERSION=2.26.1
 USER 0:0
